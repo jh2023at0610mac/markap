@@ -24,3 +24,15 @@ service cloud.firestore {
 ```
 
 If you want stricter control later, you can require `request.auth.token.admin == true`.
+
+## Posting API setup (Vercel)
+
+1. Firebase Console -> Project Settings -> Service accounts.
+2. Generate a new private key JSON.
+3. In Vercel Project -> Settings -> Environment Variables, add:
+   - `POST_SECRET` (long random value)
+   - `FIREBASE_SERVICE_ACCOUNT_JSON` (full JSON key as one-line text)
+4. Redeploy after adding env vars.
+5. Use `POST /api/post-news` with `Authorization: Bearer <POST_SECRET>`.
+
+Full request example is in `POSTING_API.md`.
