@@ -1,10 +1,10 @@
 export const firebaseConfig = {
-  apiKey: "REPLACE_WITH_API_KEY",
-  authDomain: "REPLACE_WITH_AUTH_DOMAIN",
-  projectId: "REPLACE_WITH_PROJECT_ID",
-  storageBucket: "REPLACE_WITH_STORAGE_BUCKET",
-  messagingSenderId: "REPLACE_WITH_MESSAGING_SENDER_ID",
-  appId: "REPLACE_WITH_APP_ID"
+  apiKey: "AIzaSyBtXz1Bx_IUExLr8SWz1tcbdObq0OAjyG4",
+  authDomain: "markap-98f77.firebaseapp.com",
+  projectId: "markap-98f77",
+  storageBucket: "markap-98f77.firebasestorage.app",
+  messagingSenderId: "574542573303",
+  appId: "1:574542573303:web:eb49b33b0129988140adf2"
 };
 
 export const isFirebaseConfigured = !Object.values(firebaseConfig).some((value) =>
