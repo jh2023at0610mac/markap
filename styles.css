@@ -241,6 +241,28 @@ a.ghost-btn {
   padding-bottom: 48px;
 }
 
+.auth-box {
+  border: 1px solid var(--border);
+  background: #fff;
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 14px;
+}
+
+.auth-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.auth-row input {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px;
+  font: inherit;
+  min-width: 220px;
+}
+
 @media (max-width: 1000px) {
   .news-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));

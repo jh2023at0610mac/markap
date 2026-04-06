@@ -1,6 +1,14 @@
+import {
+  getFirebaseReady,
+  getSampleNews,
+  subscribeNews,
+  incrementViews
+} from "./firebase.js";
+
 const SITE_URL = new URL("./", window.location.href).href;
 
-let news = MarkapStore.load();
+let news = [];
+let currentArticleId = null;
 
 const el = {
   newsGrid: document.getElementById("newsGrid"),
@@ -10,12 +18,8 @@ const el = {
   backBtn: document.getElementById("backBtn")
 };
 
-function saveNews() {
-  MarkapStore.save(news);
-}
-
 function formatMeta(iso) {
-  const dt = new Date(iso);
+  const dt = new Date(iso || Date.now());
   const hh = String(dt.getHours()).padStart(2, "0");
   const mm = String(dt.getMinutes()).padStart(2, "0");
   return `BU GÜN / ${hh}:${mm}`;
@@ -63,8 +67,8 @@ function updateSeoMeta(item) {
         "@type": "NewsArticle",
         headline: item.title,
         articleSection: item.category,
-        datePublished: item.createdAt,
-        dateModified: item.createdAt,
+        datePublished: new Date(item.createdAtMs).toISOString(),
+        dateModified: new Date(item.createdAtMs).toISOString(),
         image: [item.image],
         author: { "@type": "Organization", name: "Markap" },
         publisher: { "@type": "Organization", name: "Markap" },
@@ -78,7 +82,7 @@ function updateSeoMeta(item) {
 }
 
 function renderNewsGrid() {
-  const sorted = [...news].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  const sorted = [...news].sort((a, b) => Number(b.createdAtMs) - Number(a.createdAtMs));
   el.newsGrid.innerHTML = sorted
     .map(
       (item) => `
@@ -87,7 +91,7 @@ function renderNewsGrid() {
           <img loading="lazy" class="news-cover" src="${item.image}" alt="${escapeAttr(item.title)}" />
           <div class="news-body">
             <div class="news-meta">
-              <span>${formatMeta(item.createdAt)}</span>
+              <span>${formatMeta(item.createdAtMs)}</span>
               <span>👁 ${item.views || 0}</span>
             </div>
             <h3 class="news-title">${escapeHtml(item.title)}</h3>
@@ -103,13 +107,13 @@ function renderNewsGrid() {
 function showArticle(id, { pushState = true } = {}) {
   const item = news.find((n) => n.id === id);
   if (!item) return;
-  item.views = (item.views || 0) + 1;
-  saveNews();
+  currentArticleId = item.id;
+  incrementViews(item.id).catch(() => {});
 
   el.articleContent.innerHTML = `
     <img class="article-cover" src="${item.image}" alt="${escapeHtml(item.title)}" />
     <div class="article-inner">
-      <div class="news-meta">${formatMeta(item.createdAt)} • ${escapeHtml(item.category)}</div>
+      <div class="news-meta">${formatMeta(item.createdAtMs)} • ${escapeHtml(item.category)}</div>
       <h2>${escapeHtml(item.title)}</h2>
       <p>${escapeHtml(item.content)}</p>
     </div>
@@ -126,12 +130,15 @@ function showArticle(id, { pushState = true } = {}) {
   renderNewsGrid();
 }
 
-function showList() {
+function showList({ pushState = true } = {}) {
+  currentArticleId = null;
   el.articleSection.classList.add("hidden");
   el.newsListSection.classList.remove("hidden");
-  const nextUrl = new URL(window.location.href);
-  nextUrl.searchParams.delete("news");
-  history.pushState({}, "", nextUrl);
+  if (pushState) {
+    const nextUrl = new URL(window.location.href);
+    nextUrl.searchParams.delete("news");
+    history.pushState({}, "", nextUrl);
+  }
   updateSeoMeta();
 }
 
@@ -146,23 +153,48 @@ el.newsGrid.addEventListener("click", (ev) => {
 
 el.backBtn.addEventListener("click", showList);
 
-function refreshNewsFromStore() {
-  news = MarkapStore.load();
-  renderNewsGrid();
+function renderFromQuery() {
+  const newsIdFromUrl = new URL(window.location.href).searchParams.get("news");
+  if (newsIdFromUrl) {
+    showArticle(newsIdFromUrl, { pushState: false });
+    return;
+  }
+  showList({ pushState: false });
 }
 
-window.addEventListener("storage", (ev) => {
-  if (ev.key === MarkapStore.STORAGE_KEY) refreshNewsFromStore();
-});
+function showConfigWarning() {
+  el.newsGrid.innerHTML = `
+    <article class="news-card">
+      <div class="news-body">
+        <h3 class="news-title">Firebase konfiqurasiyası tamamlanmayıb</h3>
+        <p class="hint">"firebase-config.js" faylına layihə məlumatlarını əlavə edin.</p>
+      </div>
+    </article>
+  `;
+}
 
-window.addEventListener("focus", refreshNewsFromStore);
-
-renderNewsGrid();
-updateSeoMeta();
-
-const newsIdFromUrl = new URL(window.location.href).searchParams.get("news");
-if (newsIdFromUrl) {
-  showArticle(newsIdFromUrl, { pushState: false });
+if (!getFirebaseReady()) {
+  news = getSampleNews();
+  renderNewsGrid();
+  renderFromQuery();
+  showConfigWarning();
+} else {
+  subscribeNews(
+    (items) => {
+      news = items;
+      renderNewsGrid();
+      if (currentArticleId) {
+        const active = news.find((n) => n.id === currentArticleId);
+        if (active) showArticle(active.id, { pushState: false });
+      } else {
+        renderFromQuery();
+      }
+      updateSeoMeta();
+    },
+    () => {
+      showConfigWarning();
+    }
+  );
 }
 
 window.addEventListener("popstate", () => {
@@ -173,5 +205,5 @@ window.addEventListener("popstate", () => {
   }
   el.articleSection.classList.add("hidden");
   el.newsListSection.classList.remove("hidden");
-  updateSeoMeta();
+  showList({ pushState: false });
 });

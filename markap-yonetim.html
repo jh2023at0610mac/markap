@@ -17,9 +17,20 @@
 
     <main class="wrap admin-page">
       <p class="hint">
-        Bu səhifə oxucular üçün deyil. Xəbərləri əlavə edin, redaktə edin və ya silin. Dəyişikliklər
-        eyni brauzerdə saxlanılır (localStorage).
+        Bu səhifə oxucular üçün deyil. Xəbərlər Firebase Firestore-da saxlanılır və bütün cihazlarda
+        dinamik yenilənir.
       </p>
+
+      <section class="auth-box">
+        <h4>Admin giriş</h4>
+        <div class="auth-row">
+          <input id="email" type="email" placeholder="admin@mail.com" />
+          <input id="password" type="password" placeholder="şifrə" />
+          <button id="loginBtn" type="button" class="primary-btn">Daxil ol</button>
+          <button id="logoutBtn" type="button" class="ghost-btn">Çıxış</button>
+        </div>
+        <p id="authStatus" class="hint">Daxil olmamısınız.</p>
+      </section>
 
       <form id="newsForm" class="news-form">
         <input type="hidden" id="newsId" />
@@ -54,7 +65,6 @@
       <div id="adminNewsList" class="admin-news-list"></div>
     </main>
 
-    <script src="store.js"></script>
-    <script src="admin.js"></script>
+    <script type="module" src="admin.js"></script>
   </body>
 </html>

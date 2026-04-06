@@ -1,4 +1,15 @@
-let news = MarkapStore.load();
+import {
+  getFirebaseReady,
+  subscribeNews,
+  upsertNews,
+  removeNews,
+  adminSignIn,
+  adminSignOut,
+  watchAuthState
+} from "./firebase.js";
+
+let news = [];
+let user = null;
 
 const el = {
   newsForm: document.getElementById("newsForm"),
@@ -8,7 +19,12 @@ const el = {
   category: document.getElementById("category"),
   image: document.getElementById("image"),
   excerpt: document.getElementById("excerpt"),
-  content: document.getElementById("content")
+  content: document.getElementById("content"),
+  email: document.getElementById("email"),
+  password: document.getElementById("password"),
+  loginBtn: document.getElementById("loginBtn"),
+  logoutBtn: document.getElementById("logoutBtn"),
+  authStatus: document.getElementById("authStatus")
 };
 
 function formatMeta(iso) {
@@ -40,13 +56,13 @@ function fillForm(item) {
 }
 
 function renderAdminList() {
-  const sorted = [...news].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  const sorted = [...news].sort((a, b) => Number(b.createdAtMs) - Number(a.createdAtMs));
   el.adminNewsList.innerHTML = sorted
     .map(
       (item) => `
       <div class="admin-news-item">
         <b>${escapeHtml(item.title)}</b>
-        <div class="news-meta">${escapeHtml(item.category)} • ${formatMeta(item.createdAt)}</div>
+        <div class="news-meta">${escapeHtml(item.category)} • ${formatMeta(item.createdAtMs)}</div>
         <div class="admin-actions">
           <button type="button" data-action="edit" data-id="${item.id}">Düzəliş</button>
           <button type="button" data-action="delete" data-id="${item.id}">Sil</button>
@@ -57,8 +73,20 @@ function renderAdminList() {
     .join("");
 }
 
+function setAuthUi() {
+  const allowed = !!user;
+  el.newsForm.style.opacity = allowed ? "1" : "0.55";
+  [...el.newsForm.elements].forEach((node) => {
+    node.disabled = !allowed;
+  });
+  el.authStatus.textContent = allowed
+    ? `Daxil olmusunuz: ${user.email}`
+    : "Daxil olmamısınız. Əlavə/silmə üçün giriş edin.";
+}
+
 el.newsForm.addEventListener("submit", (ev) => {
   ev.preventDefault();
+  if (!user) return;
   const record = {
     id: el.newsId.value || crypto.randomUUID(),
     title: el.title.value.trim(),
@@ -70,27 +98,29 @@ el.newsForm.addEventListener("submit", (ev) => {
     createdAt: new Date().toISOString()
   };
 
-  const idx = news.findIndex((n) => n.id === record.id);
-  if (idx >= 0) {
-    record.views = news[idx].views || 0;
-    record.createdAt = news[idx].createdAt;
-    news[idx] = record;
+  const existing = news.find((n) => n.id === record.id);
+  if (existing) {
+    record.views = existing.views || 0;
+    record.createdAtMs = existing.createdAtMs;
   } else {
-    news.push(record);
+    record.createdAtMs = Date.now();
   }
-  MarkapStore.save(news);
-  renderAdminList();
-  clearForm();
+  upsertNews(record)
+    .then(clearForm)
+    .catch((err) => {
+      el.authStatus.textContent = `Xəta: ${err.message}`;
+    });
 });
 
 el.adminNewsList.addEventListener("click", (ev) => {
   const btn = ev.target.closest("button");
   if (!btn) return;
+  if (!user) return;
   const id = btn.dataset.id;
   if (btn.dataset.action === "delete") {
-    news = news.filter((n) => n.id !== id);
-    MarkapStore.save(news);
-    renderAdminList();
+    removeNews(id).catch((err) => {
+      el.authStatus.textContent = `Xəta: ${err.message}`;
+    });
     return;
   }
   if (btn.dataset.action === "edit") {
@@ -99,4 +129,40 @@ el.adminNewsList.addEventListener("click", (ev) => {
   }
 });
 
-renderAdminList();
+el.loginBtn.addEventListener("click", () => {
+  adminSignIn(el.email.value.trim(), el.password.value)
+    .then(() => {
+      el.password.value = "";
+    })
+    .catch((err) => {
+      el.authStatus.textContent = `Giriş alınmadı: ${err.message}`;
+    });
+});
+
+el.logoutBtn.addEventListener("click", () => {
+  adminSignOut().catch((err) => {
+    el.authStatus.textContent = `Çıxış xətası: ${err.message}`;
+  });
+});
+
+if (!getFirebaseReady()) {
+  el.authStatus.textContent =
+    'Firebase konfiqurasiyası tamamlanmayıb. "firebase-config.js" faylını doldurun.';
+  [...el.newsForm.elements].forEach((node) => {
+    node.disabled = true;
+  });
+} else {
+  subscribeNews(
+    (items) => {
+      news = items;
+      renderAdminList();
+    },
+    (err) => {
+      el.authStatus.textContent = `Oxuma xətası: ${err.message}`;
+    }
+  );
+  watchAuthState((nextUser) => {
+    user = nextUser;
+    setAuthUi();
+  });
+}
