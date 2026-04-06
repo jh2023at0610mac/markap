@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://jh2023at0610mac.github.io/markap/sitemap.xml
