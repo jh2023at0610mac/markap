@@ -1,4 +1,5 @@
 User-agent: *
 Allow: /
+Disallow: /markap-yonetim.html
 
 Sitemap: https://jh2023at0610mac.github.io/markap/sitemap.xml

@@ -149,6 +149,12 @@ h1 {
   cursor: pointer;
 }
 
+a.ghost-btn {
+  display: inline-block;
+  text-decoration: none;
+  color: inherit;
+}
+
 .primary-btn {
   background: var(--text);
   color: #fff;
@@ -229,6 +235,10 @@ h1 {
 .admin-actions {
   display: flex;
   gap: 8px;
+}
+
+.admin-page {
+  padding-bottom: 48px;
 }
 
 @media (max-width: 1000px) {

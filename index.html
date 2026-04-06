@@ -37,9 +37,6 @@
     <header class="topbar">
       <div class="wrap topbar-inner">
         <h1>Markap</h1>
-        <button id="adminOpenBtn" class="ghost-btn" aria-label="Admin panelini aç">
-          Admin
-        </button>
       </div>
     </header>
 
@@ -55,51 +52,7 @@
       </section>
     </main>
 
-    <aside id="adminPanel" class="admin-panel hidden" aria-hidden="true">
-      <div class="admin-content">
-        <div class="admin-head">
-          <h3>Gizli Admin Paneli</h3>
-          <button id="closeAdminBtn" class="ghost-btn">Bağla</button>
-        </div>
-
-        <p class="hint">
-          Bu panel yalnız manual xəbər əlavə etmə, silmə və düzəliş üçündür.
-        </p>
-
-        <form id="newsForm" class="news-form">
-          <input type="hidden" id="newsId" />
-          <label>
-            Başlıq
-            <input id="title" required />
-          </label>
-          <label>
-            Kateqoriya
-            <input id="category" required placeholder="Siyasət, Hadisə..." />
-          </label>
-          <label>
-            Şəkil linki
-            <input
-              id="image"
-              required
-              placeholder="https://images.unsplash.com/..."
-            />
-          </label>
-          <label>
-            Qısa təsvir
-            <textarea id="excerpt" rows="2" required></textarea>
-          </label>
-          <label>
-            Ətraflı mətn
-            <textarea id="content" rows="6" required></textarea>
-          </label>
-          <button type="submit" class="primary-btn">Yadda saxla</button>
-        </form>
-
-        <h4>Mövcud xəbərlər</h4>
-        <div id="adminNewsList" class="admin-news-list"></div>
-      </div>
-    </aside>
-
+    <script src="store.js"></script>
     <script src="app.js"></script>
   </body>
 </html>
