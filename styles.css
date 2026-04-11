@@ -224,6 +224,8 @@ h1 {
 
 .article-inner {
   padding: 18px;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .article-inner h2 {

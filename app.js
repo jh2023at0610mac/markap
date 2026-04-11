@@ -9,6 +9,8 @@ const SITE_URL = new URL("./", window.location.href).href;
 
 let news = [];
 let currentArticleId = null;
+let lastNewsListSig = "";
+let lastArticleContentSig = "";
 
 const el = {
   newsGrid: document.getElementById("newsGrid"),
@@ -102,6 +104,55 @@ function getSortedNews() {
   return [...news].sort((a, b) => Number(b.createdAtMs) - Number(a.createdAtMs));
 }
 
+function newsListSignature(items) {
+  return JSON.stringify(
+    [...items]
+      .map((i) => ({
+        id: i.id,
+        title: i.title,
+        category: i.category,
+        image: i.image || "",
+        excerpt: i.excerpt || "",
+        content: i.content || "",
+        createdAtMs: Number(i.createdAtMs || 0)
+      }))
+      .sort((a, b) => a.id.localeCompare(b.id))
+  );
+}
+
+function articleContentSignature(item) {
+  return JSON.stringify({
+    id: item.id,
+    title: item.title,
+    category: item.category,
+    content: item.content,
+    excerpt: item.excerpt || "",
+    image: item.image || "",
+    createdAtMs: Number(item.createdAtMs || 0)
+  });
+}
+
+function patchViewCountsInList(items) {
+  const byId = new Map(items.map((i) => [i.id, i]));
+  el.newsGrid?.querySelectorAll(".news-meta-views[data-news-id]").forEach((span) => {
+    const id = span.getAttribute("data-news-id");
+    const it = id ? byId.get(id) : null;
+    if (it) span.textContent = `👁 ${it.views || 0}`;
+  });
+}
+
+function patchRelatedViewCounts(items) {
+  const byId = new Map(items.map((i) => [i.id, i]));
+  el.articleContent?.querySelectorAll(".related-item[data-id]").forEach((row) => {
+    const id = row.getAttribute("data-id");
+    const it = id ? byId.get(id) : null;
+    const meta = row.querySelector(".related-meta");
+    if (it && meta) {
+      meta.textContent = `${formatMeta(it.createdAtMs)} · 👁 ${it.views || 0}`;
+    }
+  });
+}
+
 const PLACEHOLDER_IMG =
   "https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&w=800&q=80";
 
@@ -160,7 +211,7 @@ function renderNewsGrid() {
           <div class="news-body">
             <div class="news-meta">
               <span>${formatMeta(item.createdAtMs)}</span>
-              <span>👁 ${item.views || 0}</span>
+              <span class="news-meta-views" data-news-id="${item.id}">👁 ${item.views || 0}</span>
             </div>
             <h3 class="news-title">${escapeHtml(item.title)}</h3>
             <div class="news-category">${escapeHtml(item.category)}</div>
@@ -173,11 +224,13 @@ function renderNewsGrid() {
   renderHomeMore();
 }
 
-function showArticle(id, { pushState = true } = {}) {
+function showArticle(id, { pushState = true, skipViewIncrement = false } = {}) {
   const item = news.find((n) => n.id === id);
   if (!item) return;
   currentArticleId = item.id;
-  incrementViews(item.id).catch(() => {});
+  if (!skipViewIncrement) {
+    incrementViews(item.id).catch(() => {});
+  }
 
   el.articleContent.innerHTML = `
     <img class="article-cover" src="${escapeAttr(item.image || PLACEHOLDER_IMG)}" alt="${escapeHtml(item.title)}" />
@@ -196,12 +249,13 @@ function showArticle(id, { pushState = true } = {}) {
     nextUrl.searchParams.set("news", item.id);
     history.pushState({ news: item.id }, "", nextUrl);
   }
+  lastArticleContentSig = articleContentSignature(item);
   updateSeoMeta(item);
-  renderNewsGrid();
 }
 
 function showList({ pushState = true } = {}) {
   currentArticleId = null;
+  lastArticleContentSig = "";
   el.articleSection.classList.add("hidden");
   el.newsListSection.classList.remove("hidden");
   if (pushState) {
@@ -237,6 +291,8 @@ function renderFromQuery() {
 }
 
 function showConfigWarning() {
+  lastNewsListSig = "";
+  lastArticleContentSig = "";
   el.newsGrid.innerHTML = `
     <article class="news-card">
       <div class="news-body">
@@ -258,14 +314,39 @@ if (!getFirebaseReady()) {
   subscribeNews(
     (items) => {
       news = items;
-      renderNewsGrid();
+      const listSig = newsListSignature(items);
+      if (listSig !== lastNewsListSig) {
+        lastNewsListSig = listSig;
+        renderNewsGrid();
+      } else {
+        patchViewCountsInList(items);
+      }
+
+      let active = currentArticleId
+        ? news.find((n) => n.id === currentArticleId)
+        : null;
+
       if (currentArticleId) {
-        const active = news.find((n) => n.id === currentArticleId);
-        if (active) showArticle(active.id, { pushState: false });
+        if (!active) {
+          lastArticleContentSig = "";
+          showList({ pushState: false });
+        } else {
+          const aSig = articleContentSignature(active);
+          if (aSig !== lastArticleContentSig) {
+            showArticle(active.id, { pushState: false, skipViewIncrement: true });
+          } else {
+            patchViewCountsInList(items);
+            patchRelatedViewCounts(items);
+          }
+        }
       } else {
         renderFromQuery();
       }
-      updateSeoMeta();
+
+      active = currentArticleId
+        ? news.find((n) => n.id === currentArticleId)
+        : null;
+      updateSeoMeta(active || undefined);
     },
     () => {
       showConfigWarning();
