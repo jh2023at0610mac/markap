@@ -15,8 +15,12 @@ const el = {
   newsListSection: document.getElementById("newsListSection"),
   articleSection: document.getElementById("articleSection"),
   articleContent: document.getElementById("articleContent"),
-  backBtn: document.getElementById("backBtn")
+  backBtn: document.getElementById("backBtn"),
+  homeMoreSection: document.getElementById("homeMoreSection"),
+  homeMoreGrid: document.getElementById("homeMoreGrid")
 };
+
+const mainEl = document.querySelector("main");
 
 function formatMeta(iso) {
   const dt = new Date(iso || Date.now());
@@ -81,14 +85,21 @@ function updateSeoMeta(item) {
   }
 }
 
-function renderNewsGrid() {
-  const sorted = [...news].sort((a, b) => Number(b.createdAtMs) - Number(a.createdAtMs));
-  el.newsGrid.innerHTML = sorted
+function getSortedNews() {
+  return [...news].sort((a, b) => Number(b.createdAtMs) - Number(a.createdAtMs));
+}
+
+const PLACEHOLDER_IMG =
+  "https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&w=800&q=80";
+
+function renderRelatedCardsInnerHTML(items) {
+  if (!items.length) return "";
+  return items
     .map(
       (item) => `
-      <article class="news-card" data-id="${item.id}">
+      <article class="news-card news-card--compact" data-id="${item.id}">
         <a class="news-link" href="?news=${encodeURIComponent(item.id)}" aria-label="${escapeAttr(item.title)}">
-          <img loading="lazy" class="news-cover" src="${item.image}" alt="${escapeAttr(item.title)}" />
+          <img loading="lazy" class="news-cover" src="${escapeAttr(item.image || PLACEHOLDER_IMG)}" alt="${escapeAttr(item.title)}" />
           <div class="news-body">
             <div class="news-meta">
               <span>${formatMeta(item.createdAtMs)}</span>
@@ -104,6 +115,54 @@ function renderNewsGrid() {
     .join("");
 }
 
+function buildArticleRelatedHTML(excludeId) {
+  const items = getSortedNews().filter((n) => n.id !== excludeId).slice(0, 6);
+  if (!items.length) return "";
+  return `
+    <section class="article-related" aria-label="Digər xəbərlər">
+      <h2 class="section-title">Digər xəbərlər</h2>
+      <div class="related-grid">${renderRelatedCardsInnerHTML(items)}</div>
+    </section>
+  `;
+}
+
+function renderHomeMore() {
+  if (!el.homeMoreSection || !el.homeMoreGrid) return;
+  const sorted = getSortedNews();
+  if (sorted.length <= 3) {
+    el.homeMoreSection.classList.add("hidden");
+    el.homeMoreGrid.innerHTML = "";
+    return;
+  }
+  const items = sorted.slice(3, 9);
+  el.homeMoreSection.classList.remove("hidden");
+  el.homeMoreGrid.innerHTML = renderRelatedCardsInnerHTML(items);
+}
+
+function renderNewsGrid() {
+  const sorted = getSortedNews();
+  el.newsGrid.innerHTML = sorted
+    .map(
+      (item) => `
+      <article class="news-card" data-id="${item.id}">
+        <a class="news-link" href="?news=${encodeURIComponent(item.id)}" aria-label="${escapeAttr(item.title)}">
+          <img loading="lazy" class="news-cover" src="${escapeAttr(item.image || PLACEHOLDER_IMG)}" alt="${escapeAttr(item.title)}" />
+          <div class="news-body">
+            <div class="news-meta">
+              <span>${formatMeta(item.createdAtMs)}</span>
+              <span>👁 ${item.views || 0}</span>
+            </div>
+            <h3 class="news-title">${escapeHtml(item.title)}</h3>
+            <div class="news-category">${escapeHtml(item.category)}</div>
+          </div>
+        </a>
+      </article>
+    `
+    )
+    .join("");
+  renderHomeMore();
+}
+
 function showArticle(id, { pushState = true } = {}) {
   const item = news.find((n) => n.id === id);
   if (!item) return;
@@ -111,12 +170,13 @@ function showArticle(id, { pushState = true } = {}) {
   incrementViews(item.id).catch(() => {});
 
   el.articleContent.innerHTML = `
-    <img class="article-cover" src="${item.image}" alt="${escapeHtml(item.title)}" />
+    <img class="article-cover" src="${escapeAttr(item.image || PLACEHOLDER_IMG)}" alt="${escapeHtml(item.title)}" />
     <div class="article-inner">
       <div class="news-meta">${formatMeta(item.createdAtMs)} • ${escapeHtml(item.category)}</div>
       <h2>${escapeHtml(item.title)}</h2>
       <p>${escapeHtml(item.content)}</p>
     </div>
+    ${buildArticleRelatedHTML(item.id)}
   `;
 
   el.newsListSection.classList.add("hidden");
@@ -142,12 +202,12 @@ function showList({ pushState = true } = {}) {
   updateSeoMeta();
 }
 
-el.newsGrid.addEventListener("click", (ev) => {
+mainEl?.addEventListener("click", (ev) => {
   const link = ev.target.closest(".news-link");
   if (!link) return;
   ev.preventDefault();
   const card = link.closest(".news-card");
-  if (!card) return;
+  if (!card?.dataset.id) return;
   showArticle(card.dataset.id);
 });
 
@@ -171,6 +231,8 @@ function showConfigWarning() {
       </div>
     </article>
   `;
+  if (el.homeMoreSection) el.homeMoreSection.classList.add("hidden");
+  if (el.homeMoreGrid) el.homeMoreGrid.innerHTML = "";
 }
 
 if (!getFirebaseReady()) {
