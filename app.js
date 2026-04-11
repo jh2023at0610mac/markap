@@ -110,16 +110,13 @@ function renderRelatedCardsInnerHTML(items) {
   return items
     .map(
       (item) => `
-      <article class="news-card news-card--compact" data-id="${item.id}">
-        <a class="news-link" href="?news=${encodeURIComponent(item.id)}" aria-label="${escapeAttr(item.title)}">
-          <img loading="lazy" class="news-cover" src="${escapeAttr(item.image || PLACEHOLDER_IMG)}" alt="${escapeAttr(item.title)}" />
-          <div class="news-body">
-            <div class="news-meta">
-              <span>${formatMeta(item.createdAtMs)}</span>
-              <span>👁 ${item.views || 0}</span>
-            </div>
-            <h3 class="news-title">${escapeHtml(item.title)}</h3>
-            <div class="news-category">${escapeHtml(item.category)}</div>
+      <article class="related-item" data-id="${item.id}">
+        <a class="related-link news-link" href="?news=${encodeURIComponent(item.id)}" aria-label="${escapeAttr(item.title)}">
+          <img loading="lazy" class="related-thumb" src="${escapeAttr(item.image || PLACEHOLDER_IMG)}" alt="${escapeAttr(item.title)}" />
+          <div class="related-body">
+            <span class="related-cat">${escapeHtml(item.category)}</span>
+            <h3 class="related-title">${escapeHtml(item.title)}</h3>
+            <span class="related-meta">${formatMeta(item.createdAtMs)} · 👁 ${item.views || 0}</span>
           </div>
         </a>
       </article>
@@ -222,7 +219,7 @@ mainEl?.addEventListener("click", (ev) => {
   const link = base.closest(".news-link");
   if (!link) return;
   ev.preventDefault();
-  const card = link.closest(".news-card");
+  const card = link.closest(".news-card, .related-item");
   const id = card?.getAttribute("data-id") || card?.dataset?.id;
   if (!id) return;
   showArticle(id);

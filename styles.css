@@ -64,23 +64,73 @@ h1 {
 }
 
 .related-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
-.news-card--compact .news-cover {
-  aspect-ratio: 16 / 10;
-  max-height: 140px;
+.related-item {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+  overflow: hidden;
 }
 
-.news-card--compact .news-title {
-  font-size: 1.05rem;
-  line-height: 1.3;
+.related-link {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 12px;
+  color: inherit;
+  text-decoration: none;
+  touch-action: manipulation;
 }
 
-.news-card--compact .news-meta {
-  font-size: 0.78rem;
+.related-thumb {
+  width: 76px;
+  height: 58px;
+  object-fit: cover;
+  border-radius: 6px;
+  flex-shrink: 0;
+  background: var(--border);
+}
+
+.related-body {
+  min-width: 0;
+  flex: 1;
+}
+
+.related-cat {
+  display: block;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #5a9aa8;
+  margin-bottom: 4px;
+}
+
+.related-title {
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--text);
+}
+
+.related-meta {
+  display: block;
+  margin-top: 6px;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .related-item:hover {
+    border-color: #c9d6e8;
+    background: #f9fbfe;
+  }
 }
 
 .article-related {
@@ -96,7 +146,7 @@ h1 {
 }
 
 .article-related .related-grid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  max-width: 100%;
 }
 
 .news-card {
@@ -314,20 +364,10 @@ a.ghost-btn {
   .news-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-
-  .related-grid,
-  .article-related .related-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 }
 
 @media (max-width: 700px) {
   .news-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .related-grid,
-  .article-related .related-grid {
     grid-template-columns: 1fr;
   }
 
