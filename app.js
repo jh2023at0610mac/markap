@@ -203,12 +203,16 @@ function showList({ pushState = true } = {}) {
 }
 
 mainEl?.addEventListener("click", (ev) => {
-  const link = ev.target.closest(".news-link");
+  const raw = ev.target;
+  const base = raw instanceof Element ? raw : raw.parentElement;
+  if (!base) return;
+  const link = base.closest(".news-link");
   if (!link) return;
   ev.preventDefault();
   const card = link.closest(".news-card");
-  if (!card?.dataset.id) return;
-  showArticle(card.dataset.id);
+  const id = card?.getAttribute("data-id") || card?.dataset?.id;
+  if (!id) return;
+  showArticle(id);
 });
 
 el.backBtn.addEventListener("click", showList);
