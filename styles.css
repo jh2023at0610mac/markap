@@ -29,6 +29,9 @@ body {
   position: sticky;
   top: 0;
   z-index: 30;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  transform: translateZ(0);
 }
 
 .topbar-inner {
@@ -109,11 +112,14 @@ h1 {
   color: inherit;
   text-decoration: none;
   display: block;
+  touch-action: manipulation;
 }
 
-.news-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(11, 39, 76, 0.08);
+@media (hover: hover) and (pointer: fine) {
+  .news-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(11, 39, 76, 0.08);
+  }
 }
 
 .news-cover {

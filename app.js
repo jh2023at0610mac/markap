@@ -40,8 +40,21 @@ function escapeAttr(value) {
   return escapeHtml(value).replaceAll('"', "&quot;");
 }
 
+function preferShortBrowserTitle() {
+  try {
+    return (
+      window.matchMedia("(pointer: coarse)").matches ||
+      window.matchMedia("(max-width: 768px)").matches
+    );
+  } catch {
+    return false;
+  }
+}
+
 function updateSeoMeta(item) {
-  const title = item ? `${item.title} | Markap` : "Markap - Azərbaycan Xəbərləri";
+  const fullTitle = item ? `${item.title} | Markap` : "Markap - Azərbaycan Xəbərləri";
+  const browserTitle =
+    item && preferShortBrowserTitle() ? "Markap" : fullTitle;
   const description = item
     ? item.excerpt || item.content.slice(0, 150)
     : "Markap - Azərbaycan dilində gündəlik siyasət, hadisə və dünya xəbərləri.";
@@ -52,13 +65,13 @@ function updateSeoMeta(item) {
     ? `${SITE_URL}?news=${encodeURIComponent(item.id)}`
     : SITE_URL;
 
-  document.title = title;
+  document.title = browserTitle;
   document.querySelector('meta[name="description"]')?.setAttribute("content", description);
-  document.querySelector('meta[property="og:title"]')?.setAttribute("content", title);
+  document.querySelector('meta[property="og:title"]')?.setAttribute("content", fullTitle);
   document.querySelector('meta[property="og:description"]')?.setAttribute("content", description);
   document.querySelector('meta[property="og:image"]')?.setAttribute("content", image);
   document.querySelector('meta[property="og:url"]')?.setAttribute("content", canonical);
-  document.querySelector('meta[name="twitter:title"]')?.setAttribute("content", title);
+  document.querySelector('meta[name="twitter:title"]')?.setAttribute("content", fullTitle);
   document.querySelector('meta[name="twitter:description"]')?.setAttribute("content", description);
   document.querySelector('meta[name="twitter:image"]')?.setAttribute("content", image);
   document.querySelector('link[rel="canonical"]')?.setAttribute("href", canonical);
