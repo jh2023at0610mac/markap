@@ -62,6 +62,77 @@ function getNewsCollection() {
   return collection(db, "news");
 }
 
+function getVacanciesCollection() {
+  return collection(db, "vacancies");
+}
+
+const SAMPLE_VACANCIES = [
+  {
+    id: "vac-markap-001",
+    title: "Kontent redaktoru",
+    company: "Markap Media",
+    location: "Bakı (ofis)",
+    employment: "Tam ştat",
+    salary: "1200–1800 ₼",
+    source: "markap.az",
+    postedAtMs: 1712505600000,
+    summary: "Azərbaycan dilində xəbər və analitik mətnlər hazırlayan redaktor axtarılır.",
+    description:
+      "Komanda ilə birlikdə gündəlik xəbər axınını izləyəcək, mənbələrdən təsdiqlənmiş məlumatları qısa və dəqiq mətnə çevirəcəksiniz. SEO başlıqları, sosial paylaşım üçün qısa variantlar və foto/video ilə işləmə bacarığı gözlənilir.",
+    requirements:
+      "- Azərbaycan və ingilis dillərində sərbəst yazı\n- 2+ il media/redaksiya təcrübəsi\n- Fact-checking və etik jurnalistikaya hörmət\n- Təzyiq altında son tarixə uyğun işləmə",
+    status: "published"
+  },
+  {
+    id: "vac-tech-002",
+    title: "Full-stack developer (Node / React)",
+    company: "Caspian Digital Solutions",
+    location: "Bakı (hibrid)",
+    employment: "Tam ştat",
+    salary: "3000–4500 ₼",
+    source: "linkedin.com",
+    postedAtMs: 1712332800000,
+    summary: "REST API, serverless və React ilə veb məhsulların inkişafı üzrə mütəxəssis.",
+    description:
+      "Mövcud monolit və mikroservis arxitekturasına yeni xüsusiyyətlər əlavə edəcək, kod keyfiyyətini test və CI/CD ilə qoruyacaqsınız. Komanda code review və texniki sənədləşmə ilə işləyir.",
+    requirements:
+      "- TypeScript, Node.js, React\n- PostgreSQL və ya Firestore təcrübəsi\n- Git, Docker əsasları\n- Azərbaycan və ya ingilis dillərində texniki ünsiyyət",
+    status: "published"
+  },
+  {
+    id: "vac-bank-003",
+    title: "Məlumat təhlükəsizliyi analitiki",
+    company: "Regional Maliyyə Qrupu",
+    location: "Bakı",
+    employment: "Tam ştat",
+    salary: "Gizli (müsahibədə)",
+    source: "bankcareers.az",
+    postedAtMs: 1712159999999,
+    summary: "SOC hadisələri, risk qiymətləndirməsi və uyğunluq tapşırıqları üzrə analitik.",
+    description:
+      "Daxili auditlər üçün sübut toplanması, SIEM korrelyasiyalarının yoxlanması və təhlükəsizlik siyasətlərinin yenilənməsində iştirak edəcəksiniz. Üçüncü tərəf təchizatçılarla risk sorğuları aparılır.",
+    requirements:
+      "- 3+ il SOC / IR və ya risk təcrübəsi\n- ISO 27001 və ya oxşar çərçivələrə bələdçilik\n- Azərbaycan və ingilis dilləri\n- Sertifikat (Security+, CEH və s.) üstünlük",
+    status: "published"
+  },
+  {
+    id: "vac-ngo-004",
+    title: "Layihə koordinatoru (EKO)",
+    company: "Yaşıl Gələcək İctimai Birliyi",
+    location: "Gəncə / ezamiyyə",
+    employment: "Müqavilə (12 ay)",
+    salary: "1500 ₼ (brüt)",
+    source: "jobs.civil.az",
+    postedAtMs: 1711987200000,
+    summary: "Regionlarda təhsil və icma iştirakı layihələrinin icrası və hesabatı.",
+    description:
+      "Tərəfdaş məktəblərlə tədbirlərin planlaşdırılması, könüllülərin koordinasiyası və donor hesabatlarının hazırlanması daxildir. Səfər xərcləri təşkilat tərəfindən ödənilir.",
+    requirements:
+      "- Layihə idarəetməsi təcrübəsi\n- Excel/Google Sheets, təqdimat bacarığı\n- Azərbaycan dili (rus dili üstünlük)\n- Sürücülük vəsiqəsi üstünlük",
+    status: "published"
+  }
+];
+
 function normalizeNews(record) {
   return {
     id: record.id,
@@ -81,6 +152,46 @@ export function getFirebaseReady() {
 
 export function getSampleNews() {
   return SAMPLE_NEWS;
+}
+
+export function getSampleVacancies() {
+  return SAMPLE_VACANCIES.map((v) => ({ ...v }));
+}
+
+function normalizeVacancy(record) {
+  const status = String(record.status || "published").trim() || "published";
+  return {
+    id: record.id,
+    title: record.title || "",
+    company: record.company || "",
+    location: record.location || "Bakı",
+    employment: record.employment || "Tam ştat",
+    salary: record.salary != null && String(record.salary).trim() ? String(record.salary).trim() : "—",
+    source: record.source || "",
+    postedAtMs: Number(record.postedAtMs || Date.now()),
+    summary: record.summary || "",
+    description: record.description || "",
+    requirements: record.requirements || "",
+    status
+  };
+}
+
+export function subscribeVacancies(onData, onError) {
+  if (!getFirebaseReady()) {
+    onData(getSampleVacancies());
+    return () => {};
+  }
+  const q = query(getVacanciesCollection(), orderBy("postedAtMs", "desc"));
+  return onSnapshot(
+    q,
+    (snap) => {
+      const items = snap.docs
+        .map((d) => normalizeVacancy({ id: d.id, ...d.data() }))
+        .filter((v) => v.status === "published");
+      onData(items);
+    },
+    onError
+  );
 }
 
 export function subscribeNews(onData, onError) {

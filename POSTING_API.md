@@ -2,6 +2,8 @@
 
 Use this endpoint to publish ready-made articles from your other system.
 
+**Vacancies:** same `POST_SECRET` and env vars — see [POSTING_VACANCIES_API.md](./POSTING_VACANCIES_API.md) (`POST /api/post-vacancy`).
+
 ## Endpoint
 
 - `POST https://markap.vercel.app/api/post-news`

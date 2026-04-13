@@ -1,82 +1,23 @@
 import {
   getFirebaseReady,
   getSampleNews,
+  getSampleVacancies,
   subscribeNews,
+  subscribeVacancies,
   incrementViews
 } from "./firebase.js";
 
 const SITE_URL = new URL("./", window.location.href).href;
 const PAGE_SIZE = 51;
 
-const SAMPLE_VACANCIES = [
-  {
-    id: "vac-markap-001",
-    title: "Kontent redaktoru",
-    company: "Markap Media",
-    location: "Bakı (ofis)",
-    employment: "Tam ştat",
-    salary: "1200–1800 ₼",
-    source: "markap.az",
-    postedAtMs: Date.now() - 86400000,
-    summary: "Azərbaycan dilində xəbər və analitik mətnlər hazırlayan redaktor axtarılır.",
-    description:
-      "Komanda ilə birlikdə gündəlik xəbər axınını izləyəcək, mənbələrdən təsdiqlənmiş məlumatları qısa və dəqiq mətnə çevirəcəksiniz. SEO başlıqları, sosial paylaşım üçün qısa variantlar və foto/video ilə işləmə bacarığı gözlənilir.",
-    requirements:
-      "- Azərbaycan və ingilis dillərində sərbəst yazı\n- 2+ il media/redaksiya təcrübəsi\n- Fact-checking və etik jurnalistikaya hörmət\n- Təzyiq altında son tarixə uyğun işləmə"
-  },
-  {
-    id: "vac-tech-002",
-    title: "Full-stack developer (Node / React)",
-    company: "Caspian Digital Solutions",
-    location: "Bakı (hibrid)",
-    employment: "Tam ştat",
-    salary: "3000–4500 ₼",
-    source: "linkedin.com",
-    postedAtMs: Date.now() - 86400000 * 3,
-    summary: "REST API, serverless və React ilə veb məhsulların inkişafı üzrə mütəxəssis.",
-    description:
-      "Mövcud monolit və mikroservis arxitekturasına yeni xüsusiyyətlər əlavə edəcək, kod keyfiyyətini test və CI/CD ilə qoruyacaqsınız. Komanda code review və texniki sənədləşmə ilə işləyir.",
-    requirements:
-      "- TypeScript, Node.js, React\n- PostgreSQL və ya Firestore təcrübəsi\n- Git, Docker əsasları\n- Azərbaycan və ya ingilis dillərində texniki ünsiyyət"
-  },
-  {
-    id: "vac-bank-003",
-    title: "Məlumat təhlükəsizliyi analitiki",
-    company: "Regional Maliyyə Qrupu",
-    location: "Bakı",
-    employment: "Tam ştat",
-    salary: "Gizli (müsahibədə)",
-    source: "bankcareers.az",
-    postedAtMs: Date.now() - 86400000 * 5,
-    summary: "SOC hadisələri, risk qiymətləndirməsi və uyğunluq tapşırıqları üzrə analitik.",
-    description:
-      "Daxili auditlər üçün sübut toplanması, SIEM korrelyasiyalarının yoxlanması və təhlükəsizlik siyasətlərinin yenilənməsində iştirak edəcəksiniz. Üçüncü tərəf təchizatçılarla risk sorğuları aparılır.",
-    requirements:
-      "- 3+ il SOC / IR və ya risk təcrübəsi\n- ISO 27001 və ya oxşar çərçivələrə bələdçilik\n- Azərbaycan və ingilis dilləri\n- Sertifikat (Security+, CEH və s.) üstünlük"
-  },
-  {
-    id: "vac-ngo-004",
-    title: "Layihə koordinatoru (EKO)",
-    company: "Yaşıl Gələcək İctimai Birliyi",
-    location: "Gəncə / ezamiyyə",
-    employment: "Müqavilə (12 ay)",
-    salary: "1500 ₼ (brüt)",
-    source: "jobs.civil.az",
-    postedAtMs: Date.now() - 86400000 * 7,
-    summary: "Regionlarda təhsil və icma iştirakı layihələrinin icrası və hesabatı.",
-    description:
-      "Tərəfdaş məktəblərlə tədbirlərin planlaşdırılması, könüllülərin koordinasiyası və donor hesabatlarının hazırlanması daxildir. Səfər xərcləri təşkilat tərəfindən ödənilir.",
-    requirements:
-      "- Layihə idarəetməsi təcrübəsi\n- Excel/Google Sheets, təqdimat bacarığı\n- Azərbaycan dili (rus dili üstünlük)\n- Sürücülük vəsiqəsi üstünlük"
-  }
-];
-
 let news = [];
+let vacancies = [];
 let currentArticleId = null;
 let currentVacancyId = null;
 let currentPage = 1;
 let lastNewsListSig = "";
 let lastArticleContentSig = "";
+let lastVacancyDetailSig = "";
 
 const el = {
   mainTabs: document.getElementById("mainTabs"),
@@ -193,7 +134,9 @@ function updateSeoMeta(item) {
 function updateSeoMetaVacancy(v) {
   const fullTitle = `${v.title} | ${v.company} | Markap`;
   const browserTitle = preferShortBrowserTitle() ? "Markap" : fullTitle;
-  const description = v.summary || v.description.slice(0, 160);
+  const descBody = String(v.description || "");
+  const description =
+    (v.summary && String(v.summary).trim()) || descBody.slice(0, 160) || "Vakansiya — Markap.";
   const image =
     "https://images.unsplash.com/photo-1521791136064-7986c2920216?auto=format&fit=crop&w=1400&q=80";
   const canonical = `${SITE_URL}?tab=vakansiyalar&vacancy=${encodeURIComponent(v.id)}`;
@@ -217,11 +160,11 @@ function updateSeoMetaVacancy(v) {
         "@type": "JobPosting",
         title: v.title,
         datePosted: new Date(v.postedAtMs).toISOString(),
-        description: `${v.description}\n\nTələblər:\n${v.requirements}`,
+        description: `${descBody}\n\nTələblər:\n${v.requirements || ""}`,
         hiringOrganization: { "@type": "Organization", name: v.company },
         jobLocation: { "@type": "Place", name: v.location },
         employmentType: v.employment,
-        identifier: { "@type": "PropertyValue", name: "Mənbə", value: v.source },
+        identifier: { "@type": "PropertyValue", name: "Mənbə", value: v.source || "—" },
         mainEntityOfPage: canonical
       },
       null,
@@ -294,9 +237,29 @@ function switchMainTab(tab, { pushState = true } = {}) {
   updateSeoMeta();
 }
 
+function vacancyDetailSignature(v) {
+  return JSON.stringify({
+    id: v.id,
+    title: v.title,
+    company: v.company,
+    location: v.location,
+    employment: v.employment,
+    salary: v.salary,
+    source: v.source,
+    summary: v.summary || "",
+    description: v.description || "",
+    requirements: v.requirements || "",
+    postedAtMs: Number(v.postedAtMs || 0)
+  });
+}
+
 function renderVacancyGrid() {
   if (!el.vacancyGrid) return;
-  el.vacancyGrid.innerHTML = SAMPLE_VACANCIES.map(
+  if (!vacancies.length) {
+    el.vacancyGrid.innerHTML = `<p class="hint vacancy-empty">Hal-hazırda açıq vakansiya yoxdur.</p>`;
+    return;
+  }
+  el.vacancyGrid.innerHTML = vacancies.map(
     (v) => `
     <article class="vacancy-card" data-vacancy-id="${escapeAttr(v.id)}">
       <a class="vacancy-link" href="${getVacancyHref(v.id)}" aria-label="${escapeAttr(v.title)}">
@@ -321,7 +284,7 @@ function renderVacancyGrid() {
 }
 
 function showVacancy(id, { pushState = true } = {}) {
-  const v = SAMPLE_VACANCIES.find((x) => x.id === id);
+  const v = vacancies.find((x) => x.id === id);
   if (!v) return;
   currentVacancyId = v.id;
   currentArticleId = null;
@@ -364,11 +327,13 @@ function showVacancy(id, { pushState = true } = {}) {
     nextUrl.searchParams.set("vacancy", v.id);
     history.pushState({ vacancy: v.id }, "", nextUrl);
   }
+  lastVacancyDetailSig = vacancyDetailSignature(v);
   updateSeoMetaVacancy(v);
 }
 
 function showVacancyList({ pushState = true } = {}) {
   currentVacancyId = null;
+  lastVacancyDetailSig = "";
   el.vacancySection?.classList.add("hidden");
   el.articleSection.classList.add("hidden");
   el.mainTabs?.classList.remove("hidden");
@@ -599,6 +564,7 @@ function showList({ pushState = true } = {}) {
   currentArticleId = null;
   currentVacancyId = null;
   lastArticleContentSig = "";
+  lastVacancyDetailSig = "";
   el.articleSection.classList.add("hidden");
   el.vacancySection?.classList.add("hidden");
   el.mainTabs?.classList.remove("hidden");
@@ -674,6 +640,7 @@ function renderFromQuery() {
   currentArticleId = null;
   currentVacancyId = null;
   lastArticleContentSig = "";
+  lastVacancyDetailSig = "";
   el.articleSection.classList.add("hidden");
   el.vacancySection?.classList.add("hidden");
   el.mainTabs?.classList.remove("hidden");
@@ -714,11 +681,37 @@ function showConfigWarning() {
 
 if (!getFirebaseReady()) {
   news = getSampleNews();
+  vacancies = getSampleVacancies();
   renderNewsGrid();
   renderVacancyGrid();
   renderFromQuery();
   showConfigWarning();
 } else {
+  vacancies = [];
+  subscribeVacancies(
+    (items) => {
+      vacancies = items;
+      renderVacancyGrid();
+      if (currentVacancyId) {
+        const v = vacancies.find((x) => x.id === currentVacancyId);
+        if (!v) {
+          lastVacancyDetailSig = "";
+          currentVacancyId = null;
+          renderFromQuery();
+        } else {
+          const dSig = vacancyDetailSignature(v);
+          if (dSig !== lastVacancyDetailSig) {
+            showVacancy(v.id, { pushState: false });
+          }
+        }
+      }
+    },
+    () => {
+      vacancies = getSampleVacancies();
+      renderVacancyGrid();
+    }
+  );
+
   subscribeNews(
     (items) => {
       news = items;
@@ -748,10 +741,11 @@ if (!getFirebaseReady()) {
           }
         }
       } else if (currentVacancyId) {
-        const v = SAMPLE_VACANCIES.find((x) => x.id === currentVacancyId);
+        const v = vacancies.find((x) => x.id === currentVacancyId);
         if (v) {
           updateSeoMetaVacancy(v);
         } else {
+          lastVacancyDetailSig = "";
           currentVacancyId = null;
           renderFromQuery();
         }
