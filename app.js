@@ -6,9 +6,11 @@ import {
 } from "./firebase.js";
 
 const SITE_URL = new URL("./", window.location.href).href;
+const PAGE_SIZE = 51;
 
 let news = [];
 let currentArticleId = null;
+let currentPage = 1;
 let lastNewsListSig = "";
 let lastArticleContentSig = "";
 
@@ -19,7 +21,8 @@ const el = {
   articleContent: document.getElementById("articleContent"),
   backBtn: document.getElementById("backBtn"),
   homeMoreSection: document.getElementById("homeMoreSection"),
-  homeMoreGrid: document.getElementById("homeMoreGrid")
+  homeMoreGrid: document.getElementById("homeMoreGrid"),
+  pager: document.getElementById("pager")
 };
 
 const mainEl = document.querySelector("main");
@@ -100,6 +103,67 @@ function updateSeoMeta(item) {
   }
 }
 
+function getPageFromUrl() {
+  const raw = Number(new URL(window.location.href).searchParams.get("page") || "1");
+  if (!Number.isFinite(raw) || raw < 1) return 1;
+  return Math.floor(raw);
+}
+
+function getArticleHref(id) {
+  const p = getPageFromUrl();
+  return p > 1 ? `?page=${p}&news=${encodeURIComponent(id)}` : `?news=${encodeURIComponent(id)}`;
+}
+
+function buildPagerPages(totalPages, page) {
+  if (totalPages <= 7) {
+    return Array.from({ length: totalPages }, (_, idx) => idx + 1);
+  }
+  const pages = new Set([1, totalPages, page - 1, page, page + 1]);
+  if (page <= 3) {
+    pages.add(2);
+    pages.add(3);
+    pages.add(4);
+  }
+  if (page >= totalPages - 2) {
+    pages.add(totalPages - 1);
+    pages.add(totalPages - 2);
+    pages.add(totalPages - 3);
+  }
+  return [...pages].filter((n) => n >= 1 && n <= totalPages).sort((a, b) => a - b);
+}
+
+function renderPager(totalPages) {
+  if (!el.pager) return;
+  if (totalPages <= 1) {
+    el.pager.classList.add("hidden");
+    el.pager.innerHTML = "";
+    return;
+  }
+  const pages = buildPagerPages(totalPages, currentPage);
+  const bits = [];
+  bits.push(
+    `<button class="pager-btn" data-page="${Math.max(1, currentPage - 1)}" ${
+      currentPage <= 1 ? "disabled" : ""
+    }>Əvvəlki</button>`
+  );
+  pages.forEach((num, idx) => {
+    const prev = pages[idx - 1];
+    if (prev && num - prev > 1) {
+      bits.push('<span class="pager-gap">…</span>');
+    }
+    bits.push(
+      `<button class="pager-btn ${num === currentPage ? "is-active" : ""}" data-page="${num}">${num}</button>`
+    );
+  });
+  bits.push(
+    `<button class="pager-btn" data-page="${Math.min(totalPages, currentPage + 1)}" ${
+      currentPage >= totalPages ? "disabled" : ""
+    }>Növbəti</button>`
+  );
+  el.pager.classList.remove("hidden");
+  el.pager.innerHTML = bits.join("");
+}
+
 function getSortedNews() {
   return [...news].sort((a, b) => Number(b.createdAtMs) - Number(a.createdAtMs));
 }
@@ -162,7 +226,7 @@ function renderRelatedCardsInnerHTML(items) {
     .map(
       (item) => `
       <article class="related-item" data-id="${item.id}">
-        <a class="related-link news-link" href="?news=${encodeURIComponent(item.id)}" aria-label="${escapeAttr(item.title)}">
+        <a class="related-link news-link" href="${getArticleHref(item.id)}" aria-label="${escapeAttr(item.title)}">
           <img loading="lazy" class="related-thumb" src="${escapeAttr(item.image || PLACEHOLDER_IMG)}" alt="${escapeAttr(item.title)}" />
           <div class="related-body">
             <span class="related-cat">${escapeHtml(item.category)}</span>
@@ -189,24 +253,22 @@ function buildArticleRelatedHTML(excludeId) {
 
 function renderHomeMore() {
   if (!el.homeMoreSection || !el.homeMoreGrid) return;
-  const sorted = getSortedNews();
-  if (sorted.length <= 3) {
-    el.homeMoreSection.classList.add("hidden");
-    el.homeMoreGrid.innerHTML = "";
-    return;
-  }
-  const items = sorted.slice(3, 9);
-  el.homeMoreSection.classList.remove("hidden");
-  el.homeMoreGrid.innerHTML = renderRelatedCardsInnerHTML(items);
+  el.homeMoreSection.classList.add("hidden");
+  el.homeMoreGrid.innerHTML = "";
 }
 
 function renderNewsGrid() {
   const sorted = getSortedNews();
-  el.newsGrid.innerHTML = sorted
+  const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
+  currentPage = Math.min(getPageFromUrl(), totalPages);
+  const start = (currentPage - 1) * PAGE_SIZE;
+  const pageItems = sorted.slice(start, start + PAGE_SIZE);
+
+  el.newsGrid.innerHTML = pageItems
     .map(
       (item) => `
       <article class="news-card" data-id="${item.id}">
-        <a class="news-link" href="?news=${encodeURIComponent(item.id)}" aria-label="${escapeAttr(item.title)}">
+        <a class="news-link" href="${getArticleHref(item.id)}" aria-label="${escapeAttr(item.title)}">
           <img loading="lazy" class="news-cover" src="${escapeAttr(item.image || PLACEHOLDER_IMG)}" alt="${escapeAttr(item.title)}" />
           <div class="news-body">
             <div class="news-meta">
@@ -222,6 +284,7 @@ function renderNewsGrid() {
     )
     .join("");
   renderHomeMore();
+  renderPager(totalPages);
 }
 
 function showArticle(id, { pushState = true, skipViewIncrement = false } = {}) {
@@ -279,9 +342,24 @@ mainEl?.addEventListener("click", (ev) => {
   showArticle(id);
 });
 
+el.pager?.addEventListener("click", (ev) => {
+  const btn = ev.target.closest(".pager-btn[data-page]");
+  if (!btn || btn.disabled) return;
+  const page = Number(btn.dataset.page);
+  if (!Number.isFinite(page) || page < 1) return;
+  const nextUrl = new URL(window.location.href);
+  nextUrl.searchParams.set("page", String(page));
+  nextUrl.searchParams.delete("news");
+  history.pushState({}, "", nextUrl);
+  showList({ pushState: false });
+  renderNewsGrid();
+  el.newsListSection?.scrollIntoView({ behavior: "smooth", block: "start" });
+});
+
 el.backBtn.addEventListener("click", showList);
 
 function renderFromQuery() {
+  currentPage = getPageFromUrl();
   const newsIdFromUrl = new URL(window.location.href).searchParams.get("news");
   if (newsIdFromUrl) {
     showArticle(newsIdFromUrl, { pushState: false });
@@ -303,6 +381,10 @@ function showConfigWarning() {
   `;
   if (el.homeMoreSection) el.homeMoreSection.classList.add("hidden");
   if (el.homeMoreGrid) el.homeMoreGrid.innerHTML = "";
+  if (el.pager) {
+    el.pager.classList.add("hidden");
+    el.pager.innerHTML = "";
+  }
 }
 
 if (!getFirebaseReady()) {
@@ -355,6 +437,7 @@ if (!getFirebaseReady()) {
 }
 
 window.addEventListener("popstate", () => {
+  currentPage = getPageFromUrl();
   const qNews = new URL(window.location.href).searchParams.get("news");
   if (qNews) {
     showArticle(qNews, { pushState: false });

@@ -77,6 +77,38 @@ body {
   padding-bottom: 40px;
 }
 
+.pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 10px 0 34px;
+}
+
+.pager-btn {
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--text);
+  border-radius: 8px;
+  padding: 7px 11px;
+  cursor: pointer;
+  font-weight: 600;
+  min-width: 40px;
+}
+
+.pager-btn.is-active {
+  background: var(--text);
+  color: #fff;
+  border-color: var(--text);
+}
+
+.pager-gap {
+  color: var(--muted);
+  font-size: 0.9rem;
+  padding: 0 2px;
+}
+
 .related-grid {
   display: flex;
   flex-direction: column;
