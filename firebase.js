@@ -159,7 +159,8 @@ export function getSampleVacancies() {
 }
 
 function normalizeVacancy(record) {
-  const status = String(record.status || "published").trim() || "published";
+  const raw = String(record.status || "published").trim() || "published";
+  const status = raw.toLowerCase() === "draft" ? "draft" : "published";
   return {
     id: record.id,
     title: record.title || "",
@@ -187,7 +188,7 @@ export function subscribeVacancies(onData, onError) {
     (snap) => {
       const items = snap.docs
         .map((d) => normalizeVacancy({ id: d.id, ...d.data() }))
-        .filter((v) => v.status === "published");
+        .filter((v) => v.status !== "draft");
       onData(items);
     },
     onError

@@ -706,7 +706,8 @@ if (!getFirebaseReady()) {
         }
       }
     },
-    () => {
+    (err) => {
+      console.warn("[vacancies] Firestore listen failed (rules or network?)", err?.message || err);
       vacancies = getSampleVacancies();
       renderVacancyGrid();
     }
