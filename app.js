@@ -8,13 +8,86 @@ import {
 const SITE_URL = new URL("./", window.location.href).href;
 const PAGE_SIZE = 51;
 
+const SAMPLE_VACANCIES = [
+  {
+    id: "vac-markap-001",
+    title: "Kontent redaktoru",
+    company: "Markap Media",
+    location: "Bakı (ofis)",
+    employment: "Tam ştat",
+    salary: "1200–1800 ₼",
+    source: "markap.az",
+    postedAtMs: Date.now() - 86400000,
+    summary: "Azərbaycan dilində xəbər və analitik mətnlər hazırlayan redaktor axtarılır.",
+    description:
+      "Komanda ilə birlikdə gündəlik xəbər axınını izləyəcək, mənbələrdən təsdiqlənmiş məlumatları qısa və dəqiq mətnə çevirəcəksiniz. SEO başlıqları, sosial paylaşım üçün qısa variantlar və foto/video ilə işləmə bacarığı gözlənilir.",
+    requirements:
+      "- Azərbaycan və ingilis dillərində sərbəst yazı\n- 2+ il media/redaksiya təcrübəsi\n- Fact-checking və etik jurnalistikaya hörmət\n- Təzyiq altında son tarixə uyğun işləmə"
+  },
+  {
+    id: "vac-tech-002",
+    title: "Full-stack developer (Node / React)",
+    company: "Caspian Digital Solutions",
+    location: "Bakı (hibrid)",
+    employment: "Tam ştat",
+    salary: "3000–4500 ₼",
+    source: "linkedin.com",
+    postedAtMs: Date.now() - 86400000 * 3,
+    summary: "REST API, serverless və React ilə veb məhsulların inkişafı üzrə mütəxəssis.",
+    description:
+      "Mövcud monolit və mikroservis arxitekturasına yeni xüsusiyyətlər əlavə edəcək, kod keyfiyyətini test və CI/CD ilə qoruyacaqsınız. Komanda code review və texniki sənədləşmə ilə işləyir.",
+    requirements:
+      "- TypeScript, Node.js, React\n- PostgreSQL və ya Firestore təcrübəsi\n- Git, Docker əsasları\n- Azərbaycan və ya ingilis dillərində texniki ünsiyyət"
+  },
+  {
+    id: "vac-bank-003",
+    title: "Məlumat təhlükəsizliyi analitiki",
+    company: "Regional Maliyyə Qrupu",
+    location: "Bakı",
+    employment: "Tam ştat",
+    salary: "Gizli (müsahibədə)",
+    source: "bankcareers.az",
+    postedAtMs: Date.now() - 86400000 * 5,
+    summary: "SOC hadisələri, risk qiymətləndirməsi və uyğunluq tapşırıqları üzrə analitik.",
+    description:
+      "Daxili auditlər üçün sübut toplanması, SIEM korrelyasiyalarının yoxlanması və təhlükəsizlik siyasətlərinin yenilənməsində iştirak edəcəksiniz. Üçüncü tərəf təchizatçılarla risk sorğuları aparılır.",
+    requirements:
+      "- 3+ il SOC / IR və ya risk təcrübəsi\n- ISO 27001 və ya oxşar çərçivələrə bələdçilik\n- Azərbaycan və ingilis dilləri\n- Sertifikat (Security+, CEH və s.) üstünlük"
+  },
+  {
+    id: "vac-ngo-004",
+    title: "Layihə koordinatoru (EKO)",
+    company: "Yaşıl Gələcək İctimai Birliyi",
+    location: "Gəncə / ezamiyyə",
+    employment: "Müqavilə (12 ay)",
+    salary: "1500 ₼ (brüt)",
+    source: "jobs.civil.az",
+    postedAtMs: Date.now() - 86400000 * 7,
+    summary: "Regionlarda təhsil və icma iştirakı layihələrinin icrası və hesabatı.",
+    description:
+      "Tərəfdaş məktəblərlə tədbirlərin planlaşdırılması, könüllülərin koordinasiyası və donor hesabatlarının hazırlanması daxildir. Səfər xərcləri təşkilat tərəfindən ödənilir.",
+    requirements:
+      "- Layihə idarəetməsi təcrübəsi\n- Excel/Google Sheets, təqdimat bacarığı\n- Azərbaycan dili (rus dili üstünlük)\n- Sürücülük vəsiqəsi üstünlük"
+  }
+];
+
 let news = [];
 let currentArticleId = null;
+let currentVacancyId = null;
 let currentPage = 1;
 let lastNewsListSig = "";
 let lastArticleContentSig = "";
 
 const el = {
+  mainTabs: document.getElementById("mainTabs"),
+  tabBtnNews: document.getElementById("tabBtnNews"),
+  tabBtnVacancies: document.getElementById("tabBtnVacancies"),
+  tabPanelNews: document.getElementById("tabPanelNews"),
+  tabPanelVacancies: document.getElementById("tabPanelVacancies"),
+  vacancyGrid: document.getElementById("vacancyGrid"),
+  vacancySection: document.getElementById("vacancySection"),
+  vacancyContent: document.getElementById("vacancyContent"),
+  vacancyBackBtn: document.getElementById("vacancyBackBtn"),
   newsGrid: document.getElementById("newsGrid"),
   newsListSection: document.getElementById("newsListSection"),
   articleSection: document.getElementById("articleSection"),
@@ -101,6 +174,60 @@ function updateSeoMeta(item) {
       2
     );
   }
+  if (jsonLd && !item) {
+    jsonLd.textContent = JSON.stringify(
+      {
+        "@context": "https://schema.org",
+        "@type": "NewsMediaOrganization",
+        name: "Markap",
+        url: SITE_URL.replace(/\/?$/, "/"),
+        logo: "https://images.unsplash.com/photo-1517457373958-b7bdd4587205?auto=format&fit=crop&w=600&q=80",
+        sameAs: ["https://github.com/jh2023at0610mac/markap"]
+      },
+      null,
+      2
+    );
+  }
+}
+
+function updateSeoMetaVacancy(v) {
+  const fullTitle = `${v.title} | ${v.company} | Markap`;
+  const browserTitle = preferShortBrowserTitle() ? "Markap" : fullTitle;
+  const description = v.summary || v.description.slice(0, 160);
+  const image =
+    "https://images.unsplash.com/photo-1521791136064-7986c2920216?auto=format&fit=crop&w=1400&q=80";
+  const canonical = `${SITE_URL}?tab=vakansiyalar&vacancy=${encodeURIComponent(v.id)}`;
+
+  document.title = browserTitle;
+  document.querySelector('meta[name="description"]')?.setAttribute("content", description);
+  document.querySelector('meta[property="og:title"]')?.setAttribute("content", fullTitle);
+  document.querySelector('meta[property="og:description"]')?.setAttribute("content", description);
+  document.querySelector('meta[property="og:image"]')?.setAttribute("content", image);
+  document.querySelector('meta[property="og:url"]')?.setAttribute("content", canonical);
+  document.querySelector('meta[name="twitter:title"]')?.setAttribute("content", fullTitle);
+  document.querySelector('meta[name="twitter:description"]')?.setAttribute("content", description);
+  document.querySelector('meta[name="twitter:image"]')?.setAttribute("content", image);
+  document.querySelector('link[rel="canonical"]')?.setAttribute("href", canonical);
+
+  const jsonLd = document.getElementById("seoJsonLd");
+  if (jsonLd) {
+    jsonLd.textContent = JSON.stringify(
+      {
+        "@context": "https://schema.org",
+        "@type": "JobPosting",
+        title: v.title,
+        datePosted: new Date(v.postedAtMs).toISOString(),
+        description: `${v.description}\n\nTələblər:\n${v.requirements}`,
+        hiringOrganization: { "@type": "Organization", name: v.company },
+        jobLocation: { "@type": "Place", name: v.location },
+        employmentType: v.employment,
+        identifier: { "@type": "PropertyValue", name: "Mənbə", value: v.source },
+        mainEntityOfPage: canonical
+      },
+      null,
+      2
+    );
+  }
 }
 
 function getPageFromUrl() {
@@ -112,6 +239,152 @@ function getPageFromUrl() {
 function getArticleHref(id) {
   const p = getPageFromUrl();
   return p > 1 ? `?page=${p}&news=${encodeURIComponent(id)}` : `?news=${encodeURIComponent(id)}`;
+}
+
+function getVacancyHref(id) {
+  return `?tab=vakansiyalar&vacancy=${encodeURIComponent(id)}`;
+}
+
+function formatVacancyPosted(ms) {
+  try {
+    return new Date(ms || Date.now()).toLocaleDateString("az-AZ", {
+      day: "numeric",
+      month: "short",
+      year: "numeric"
+    });
+  } catch {
+    return "";
+  }
+}
+
+function setActiveTabButtons(tab) {
+  el.tabBtnNews?.classList.toggle("is-active", tab === "xeberler");
+  el.tabBtnVacancies?.classList.toggle("is-active", tab === "vakansiyalar");
+}
+
+function switchMainTab(tab, { pushState = true } = {}) {
+  if (currentArticleId || currentVacancyId) return;
+  el.mainTabs?.classList.remove("hidden");
+  el.articleSection.classList.add("hidden");
+  el.vacancySection?.classList.add("hidden");
+  if (tab === "vakansiyalar") {
+    el.tabPanelNews?.classList.add("hidden");
+    el.tabPanelVacancies?.classList.remove("hidden");
+    setActiveTabButtons("vakansiyalar");
+    renderVacancyGrid();
+  } else {
+    el.tabPanelVacancies?.classList.add("hidden");
+    el.tabPanelNews?.classList.remove("hidden");
+    el.newsListSection.classList.remove("hidden");
+    setActiveTabButtons("xeberler");
+    renderNewsGrid();
+  }
+  if (pushState) {
+    const nextUrl = new URL(window.location.href);
+    nextUrl.searchParams.delete("news");
+    nextUrl.searchParams.delete("vacancy");
+    if (tab === "vakansiyalar") {
+      nextUrl.searchParams.delete("page");
+      nextUrl.searchParams.set("tab", "vakansiyalar");
+    } else {
+      nextUrl.searchParams.delete("tab");
+    }
+    history.pushState({}, "", nextUrl);
+  }
+  updateSeoMeta();
+}
+
+function renderVacancyGrid() {
+  if (!el.vacancyGrid) return;
+  el.vacancyGrid.innerHTML = SAMPLE_VACANCIES.map(
+    (v) => `
+    <article class="vacancy-card" data-vacancy-id="${escapeAttr(v.id)}">
+      <a class="vacancy-link" href="${getVacancyHref(v.id)}" aria-label="${escapeAttr(v.title)}">
+        <div class="vacancy-body">
+          <div class="vacancy-meta">
+            <span class="vacancy-source">${escapeHtml(v.source)}</span>
+            <span>${formatVacancyPosted(v.postedAtMs)}</span>
+          </div>
+          <h3 class="vacancy-title">${escapeHtml(v.title)}</h3>
+          <div class="vacancy-company">${escapeHtml(v.company)}</div>
+          <p class="vacancy-summary">${escapeHtml(v.summary)}</p>
+          <div class="vacancy-tags">
+            <span>${escapeHtml(v.location)}</span>
+            <span>${escapeHtml(v.employment)}</span>
+            <span>${escapeHtml(v.salary)}</span>
+          </div>
+        </div>
+      </a>
+    </article>
+  `
+  ).join("");
+}
+
+function showVacancy(id, { pushState = true } = {}) {
+  const v = SAMPLE_VACANCIES.find((x) => x.id === id);
+  if (!v) return;
+  currentVacancyId = v.id;
+  currentArticleId = null;
+  lastArticleContentSig = "";
+
+  el.vacancyContent.innerHTML = `
+    <div class="vacancy-detail-head">
+      <div class="vacancy-detail-meta">
+        <span class="vacancy-source">${escapeHtml(v.source)}</span>
+        <span>${formatVacancyPosted(v.postedAtMs)}</span>
+      </div>
+      <h2>${escapeHtml(v.title)}</h2>
+      <div class="vacancy-detail-company">${escapeHtml(v.company)}</div>
+      <ul class="vacancy-detail-facts">
+        <li><strong>Yer</strong> ${escapeHtml(v.location)}</li>
+        <li><strong>İş növü</strong> ${escapeHtml(v.employment)}</li>
+        <li><strong>Əməkhaqqı</strong> ${escapeHtml(v.salary)}</li>
+        <li><strong>Mənbə</strong> ${escapeHtml(v.source)}</li>
+      </ul>
+    </div>
+    <div class="article-inner vacancy-detail-inner">
+      <h3 class="vacancy-block-title">İşin təsviri</h3>
+      <p>${escapeHtml(v.description)}</p>
+      <h3 class="vacancy-block-title">Tələblər</h3>
+      <p class="vacancy-req">${escapeHtml(v.requirements)}</p>
+    </div>
+  `;
+
+  el.mainTabs?.classList.add("hidden");
+  el.tabPanelNews?.classList.add("hidden");
+  el.tabPanelVacancies?.classList.add("hidden");
+  el.articleSection.classList.add("hidden");
+  el.vacancySection?.classList.remove("hidden");
+
+  if (pushState) {
+    const nextUrl = new URL(window.location.href);
+    nextUrl.searchParams.delete("news");
+    nextUrl.searchParams.delete("page");
+    nextUrl.searchParams.set("tab", "vakansiyalar");
+    nextUrl.searchParams.set("vacancy", v.id);
+    history.pushState({ vacancy: v.id }, "", nextUrl);
+  }
+  updateSeoMetaVacancy(v);
+}
+
+function showVacancyList({ pushState = true } = {}) {
+  currentVacancyId = null;
+  el.vacancySection?.classList.add("hidden");
+  el.articleSection.classList.add("hidden");
+  el.mainTabs?.classList.remove("hidden");
+  el.tabPanelNews?.classList.add("hidden");
+  el.tabPanelVacancies?.classList.remove("hidden");
+  setActiveTabButtons("vakansiyalar");
+  if (pushState) {
+    const nextUrl = new URL(window.location.href);
+    nextUrl.searchParams.delete("vacancy");
+    nextUrl.searchParams.delete("news");
+    nextUrl.searchParams.delete("page");
+    nextUrl.searchParams.set("tab", "vakansiyalar");
+    history.pushState({}, "", nextUrl);
+  }
+  renderVacancyGrid();
+  updateSeoMeta();
 }
 
 function buildPagerPages(totalPages, page) {
@@ -305,10 +578,16 @@ function showArticle(id, { pushState = true, skipViewIncrement = false } = {}) {
     ${buildArticleRelatedHTML(item.id)}
   `;
 
+  el.mainTabs?.classList.add("hidden");
+  el.tabPanelNews?.classList.add("hidden");
+  el.tabPanelVacancies?.classList.add("hidden");
+  el.vacancySection?.classList.add("hidden");
   el.newsListSection.classList.add("hidden");
   el.articleSection.classList.remove("hidden");
   if (pushState) {
     const nextUrl = new URL(window.location.href);
+    nextUrl.searchParams.delete("vacancy");
+    nextUrl.searchParams.delete("tab");
     nextUrl.searchParams.set("news", item.id);
     history.pushState({ news: item.id }, "", nextUrl);
   }
@@ -318,12 +597,20 @@ function showArticle(id, { pushState = true, skipViewIncrement = false } = {}) {
 
 function showList({ pushState = true } = {}) {
   currentArticleId = null;
+  currentVacancyId = null;
   lastArticleContentSig = "";
   el.articleSection.classList.add("hidden");
+  el.vacancySection?.classList.add("hidden");
+  el.mainTabs?.classList.remove("hidden");
+  el.tabPanelVacancies?.classList.add("hidden");
+  el.tabPanelNews?.classList.remove("hidden");
   el.newsListSection.classList.remove("hidden");
+  setActiveTabButtons("xeberler");
   if (pushState) {
     const nextUrl = new URL(window.location.href);
     nextUrl.searchParams.delete("news");
+    nextUrl.searchParams.delete("vacancy");
+    nextUrl.searchParams.delete("tab");
     history.pushState({}, "", nextUrl);
   }
   updateSeoMeta();
@@ -333,6 +620,14 @@ mainEl?.addEventListener("click", (ev) => {
   const raw = ev.target;
   const base = raw instanceof Element ? raw : raw.parentElement;
   if (!base) return;
+  const vlink = base.closest(".vacancy-link");
+  if (vlink) {
+    ev.preventDefault();
+    const card = vlink.closest("[data-vacancy-id]");
+    const vid = card?.getAttribute("data-vacancy-id");
+    if (vid) showVacancy(vid);
+    return;
+  }
   const link = base.closest(".news-link");
   if (!link) return;
   ev.preventDefault();
@@ -350,6 +645,8 @@ el.pager?.addEventListener("click", (ev) => {
   const nextUrl = new URL(window.location.href);
   nextUrl.searchParams.set("page", String(page));
   nextUrl.searchParams.delete("news");
+  nextUrl.searchParams.delete("vacancy");
+  nextUrl.searchParams.delete("tab");
   history.pushState({}, "", nextUrl);
   showList({ pushState: false });
   renderNewsGrid();
@@ -357,15 +654,43 @@ el.pager?.addEventListener("click", (ev) => {
 });
 
 el.backBtn.addEventListener("click", showList);
+el.vacancyBackBtn?.addEventListener("click", () => showVacancyList());
+el.tabBtnNews?.addEventListener("click", () => switchMainTab("xeberler"));
+el.tabBtnVacancies?.addEventListener("click", () => switchMainTab("vakansiyalar"));
 
 function renderFromQuery() {
   currentPage = getPageFromUrl();
-  const newsIdFromUrl = new URL(window.location.href).searchParams.get("news");
+  const url = new URL(window.location.href);
+  const newsIdFromUrl = url.searchParams.get("news");
+  const vacancyIdFromUrl = url.searchParams.get("vacancy");
   if (newsIdFromUrl) {
     showArticle(newsIdFromUrl, { pushState: false });
     return;
   }
-  showList({ pushState: false });
+  if (vacancyIdFromUrl) {
+    showVacancy(vacancyIdFromUrl, { pushState: false });
+    return;
+  }
+  currentArticleId = null;
+  currentVacancyId = null;
+  lastArticleContentSig = "";
+  el.articleSection.classList.add("hidden");
+  el.vacancySection?.classList.add("hidden");
+  el.mainTabs?.classList.remove("hidden");
+  const onVacancies = url.searchParams.get("tab") === "vakansiyalar";
+  if (onVacancies) {
+    el.tabPanelNews?.classList.add("hidden");
+    el.tabPanelVacancies?.classList.remove("hidden");
+    setActiveTabButtons("vakansiyalar");
+    renderVacancyGrid();
+  } else {
+    el.tabPanelVacancies?.classList.add("hidden");
+    el.tabPanelNews?.classList.remove("hidden");
+    el.newsListSection.classList.remove("hidden");
+    setActiveTabButtons("xeberler");
+    renderNewsGrid();
+  }
+  updateSeoMeta();
 }
 
 function showConfigWarning() {
@@ -390,6 +715,7 @@ function showConfigWarning() {
 if (!getFirebaseReady()) {
   news = getSampleNews();
   renderNewsGrid();
+  renderVacancyGrid();
   renderFromQuery();
   showConfigWarning();
 } else {
@@ -421,6 +747,14 @@ if (!getFirebaseReady()) {
             patchRelatedViewCounts(items);
           }
         }
+      } else if (currentVacancyId) {
+        const v = SAMPLE_VACANCIES.find((x) => x.id === currentVacancyId);
+        if (v) {
+          updateSeoMetaVacancy(v);
+        } else {
+          currentVacancyId = null;
+          renderFromQuery();
+        }
       } else {
         renderFromQuery();
       }
@@ -428,7 +762,9 @@ if (!getFirebaseReady()) {
       active = currentArticleId
         ? news.find((n) => n.id === currentArticleId)
         : null;
-      updateSeoMeta(active || undefined);
+      if (!currentVacancyId) {
+        updateSeoMeta(active || undefined);
+      }
     },
     () => {
       showConfigWarning();
@@ -438,12 +774,16 @@ if (!getFirebaseReady()) {
 
 window.addEventListener("popstate", () => {
   currentPage = getPageFromUrl();
-  const qNews = new URL(window.location.href).searchParams.get("news");
+  const url = new URL(window.location.href);
+  const qNews = url.searchParams.get("news");
+  const qVacancy = url.searchParams.get("vacancy");
   if (qNews) {
     showArticle(qNews, { pushState: false });
     return;
   }
-  el.articleSection.classList.add("hidden");
-  el.newsListSection.classList.remove("hidden");
-  showList({ pushState: false });
+  if (qVacancy) {
+    showVacancy(qVacancy, { pushState: false });
+    return;
+  }
+  renderFromQuery();
 });

@@ -49,20 +49,42 @@
     </header>
 
     <main class="wrap">
-      <section id="newsListSection">
-        <h2 class="section-title">Son xəbərlər</h2>
-        <div id="newsGrid" class="news-grid"></div>
+      <nav id="mainTabs" class="main-tabs" aria-label="Bölmələr">
+        <button type="button" class="main-tab is-active" id="tabBtnNews" data-tab="xeberler">
+          Xəbərlər
+        </button>
+        <button type="button" class="main-tab" id="tabBtnVacancies" data-tab="vakansiyalar">
+          Vakansiyalar
+        </button>
+      </nav>
 
-        <section id="homeMoreSection" class="related-section hidden" aria-label="Oxumağa tövsiyə">
-          <h2 class="section-title">Oxumağa tövsiyə</h2>
-          <div id="homeMoreGrid" class="related-grid"></div>
+      <div id="tabPanelNews">
+        <section id="newsListSection">
+          <h2 class="section-title">Son xəbərlər</h2>
+          <div id="newsGrid" class="news-grid"></div>
+
+          <section id="homeMoreSection" class="related-section hidden" aria-label="Oxumağa tövsiyə">
+            <h2 class="section-title">Oxumağa tövsiyə</h2>
+            <div id="homeMoreGrid" class="related-grid"></div>
+          </section>
+          <nav id="pager" class="pager hidden" aria-label="Xəbər səhifələri"></nav>
         </section>
-        <nav id="pager" class="pager hidden" aria-label="Xəbər səhifələri"></nav>
-      </section>
+      </div>
+
+      <div id="tabPanelVacancies" class="hidden">
+        <h2 class="section-title">Açıq vakansiyalar</h2>
+        <p class="hint tab-hint">Müxtəlif mənbələrdən nümunə elanlar. Təfərrüat üçün vakansiyaya toxunun.</p>
+        <div id="vacancyGrid" class="vacancy-grid"></div>
+      </div>
 
       <section id="articleSection" class="article-section hidden">
         <button id="backBtn" class="back-btn">← Xəbərlərə qayıt</button>
         <article id="articleContent" class="article-card"></article>
+      </section>
+
+      <section id="vacancySection" class="article-section hidden">
+        <button id="vacancyBackBtn" class="back-btn">← Vakansiyalara qayıt</button>
+        <article id="vacancyContent" class="article-card"></article>
       </section>
     </main>
 
