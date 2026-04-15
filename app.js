@@ -15,6 +15,7 @@ let vacancies = [];
 let currentArticleId = null;
 let currentVacancyId = null;
 let currentPage = 1;
+let currentVacancyPage = 1;
 let lastNewsListSig = "";
 let lastArticleContentSig = "";
 let lastVacancyDetailSig = "";
@@ -36,13 +37,25 @@ const el = {
   backBtn: document.getElementById("backBtn"),
   homeMoreSection: document.getElementById("homeMoreSection"),
   homeMoreGrid: document.getElementById("homeMoreGrid"),
-  pager: document.getElementById("pager")
+  pager: document.getElementById("pager"),
+  vacancyPager: document.getElementById("vacancyPager")
 };
 
 const mainEl = document.querySelector("main");
 
 function formatMeta(iso) {
   const dt = new Date(iso || Date.now());
+  const now = new Date();
+  const isToday =
+    dt.getFullYear() === now.getFullYear() &&
+    dt.getMonth() === now.getMonth() &&
+    dt.getDate() === now.getDate();
+  if (!isToday) {
+    const dd = String(dt.getDate()).padStart(2, "0");
+    const mm = String(dt.getMonth() + 1).padStart(2, "0");
+    const yyyy = dt.getFullYear();
+    return `${dd}.${mm}.${yyyy}`;
+  }
   const hh = String(dt.getHours()).padStart(2, "0");
   const mm = String(dt.getMinutes()).padStart(2, "0");
   return `BU GÜN / ${hh}:${mm}`;
@@ -179,13 +192,21 @@ function getPageFromUrl() {
   return Math.floor(raw);
 }
 
+function getVacancyPageFromUrl() {
+  const raw = Number(new URL(window.location.href).searchParams.get("vpage") || "1");
+  if (!Number.isFinite(raw) || raw < 1) return 1;
+  return Math.floor(raw);
+}
+
 function getArticleHref(id) {
   const p = getPageFromUrl();
   return p > 1 ? `?page=${p}&news=${encodeURIComponent(id)}` : `?news=${encodeURIComponent(id)}`;
 }
 
 function getVacancyHref(id) {
-  return `?tab=vakansiyalar&vacancy=${encodeURIComponent(id)}`;
+  const p = getVacancyPageFromUrl();
+  const base = p > 1 ? `?tab=vakansiyalar&vpage=${p}` : "?tab=vakansiyalar";
+  return `${base}&vacancy=${encodeURIComponent(id)}`;
 }
 
 function formatVacancyPosted(ms) {
@@ -226,6 +247,7 @@ function switchMainTab(tab, { pushState = true } = {}) {
     const nextUrl = new URL(window.location.href);
     nextUrl.searchParams.delete("news");
     nextUrl.searchParams.delete("vacancy");
+    nextUrl.searchParams.delete("vpage");
     if (tab === "vakansiyalar") {
       nextUrl.searchParams.delete("page");
       nextUrl.searchParams.set("tab", "vakansiyalar");
@@ -255,11 +277,20 @@ function vacancyDetailSignature(v) {
 
 function renderVacancyGrid() {
   if (!el.vacancyGrid) return;
-  if (!vacancies.length) {
+  const totalPages = Math.max(1, Math.ceil(vacancies.length / PAGE_SIZE));
+  currentVacancyPage = Math.min(getVacancyPageFromUrl(), totalPages);
+  const start = (currentVacancyPage - 1) * PAGE_SIZE;
+  const pageItems = vacancies.slice(start, start + PAGE_SIZE);
+
+  if (!pageItems.length) {
     el.vacancyGrid.innerHTML = `<p class="hint vacancy-empty">Hal-hazırda açıq vakansiya yoxdur.</p>`;
+    if (el.vacancyPager) {
+      el.vacancyPager.classList.add("hidden");
+      el.vacancyPager.innerHTML = "";
+    }
     return;
   }
-  el.vacancyGrid.innerHTML = vacancies.map(
+  el.vacancyGrid.innerHTML = pageItems.map(
     (v) => `
     <article class="vacancy-card" data-vacancy-id="${escapeAttr(v.id)}">
       <a class="vacancy-link" href="${getVacancyHref(v.id)}" aria-label="${escapeAttr(v.title)}">
@@ -281,6 +312,7 @@ function renderVacancyGrid() {
     </article>
   `
   ).join("");
+  renderVacancyPager(totalPages);
 }
 
 function showVacancy(id, { pushState = true } = {}) {
@@ -346,6 +378,11 @@ function showVacancyList({ pushState = true } = {}) {
     nextUrl.searchParams.delete("news");
     nextUrl.searchParams.delete("page");
     nextUrl.searchParams.set("tab", "vakansiyalar");
+    if (currentVacancyPage > 1) {
+      nextUrl.searchParams.set("vpage", String(currentVacancyPage));
+    } else {
+      nextUrl.searchParams.delete("vpage");
+    }
     history.pushState({}, "", nextUrl);
   }
   renderVacancyGrid();
@@ -400,6 +437,38 @@ function renderPager(totalPages) {
   );
   el.pager.classList.remove("hidden");
   el.pager.innerHTML = bits.join("");
+}
+
+function renderVacancyPager(totalPages) {
+  if (!el.vacancyPager) return;
+  if (totalPages <= 1) {
+    el.vacancyPager.classList.add("hidden");
+    el.vacancyPager.innerHTML = "";
+    return;
+  }
+  const pages = buildPagerPages(totalPages, currentVacancyPage);
+  const bits = [];
+  bits.push(
+    `<button class="pager-btn" data-vpage="${Math.max(1, currentVacancyPage - 1)}" ${
+      currentVacancyPage <= 1 ? "disabled" : ""
+    }>Əvvəlki</button>`
+  );
+  pages.forEach((num, idx) => {
+    const prev = pages[idx - 1];
+    if (prev && num - prev > 1) {
+      bits.push('<span class="pager-gap">…</span>');
+    }
+    bits.push(
+      `<button class="pager-btn ${num === currentVacancyPage ? "is-active" : ""}" data-vpage="${num}">${num}</button>`
+    );
+  });
+  bits.push(
+    `<button class="pager-btn" data-vpage="${Math.min(totalPages, currentVacancyPage + 1)}" ${
+      currentVacancyPage >= totalPages ? "disabled" : ""
+    }>Növbəti</button>`
+  );
+  el.vacancyPager.classList.remove("hidden");
+  el.vacancyPager.innerHTML = bits.join("");
 }
 
 function getSortedNews() {
@@ -553,6 +622,7 @@ function showArticle(id, { pushState = true, skipViewIncrement = false } = {}) {
     const nextUrl = new URL(window.location.href);
     nextUrl.searchParams.delete("vacancy");
     nextUrl.searchParams.delete("tab");
+    nextUrl.searchParams.delete("vpage");
     nextUrl.searchParams.set("news", item.id);
     history.pushState({ news: item.id }, "", nextUrl);
   }
@@ -577,6 +647,7 @@ function showList({ pushState = true } = {}) {
     nextUrl.searchParams.delete("news");
     nextUrl.searchParams.delete("vacancy");
     nextUrl.searchParams.delete("tab");
+    nextUrl.searchParams.delete("vpage");
     history.pushState({}, "", nextUrl);
   }
   updateSeoMeta();
@@ -613,10 +684,31 @@ el.pager?.addEventListener("click", (ev) => {
   nextUrl.searchParams.delete("news");
   nextUrl.searchParams.delete("vacancy");
   nextUrl.searchParams.delete("tab");
+  nextUrl.searchParams.delete("vpage");
   history.pushState({}, "", nextUrl);
   showList({ pushState: false });
   renderNewsGrid();
   el.newsListSection?.scrollIntoView({ behavior: "smooth", block: "start" });
+});
+
+el.vacancyPager?.addEventListener("click", (ev) => {
+  const btn = ev.target.closest(".pager-btn[data-vpage]");
+  if (!btn || btn.disabled) return;
+  const page = Number(btn.dataset.vpage);
+  if (!Number.isFinite(page) || page < 1) return;
+  const nextUrl = new URL(window.location.href);
+  nextUrl.searchParams.delete("news");
+  nextUrl.searchParams.delete("page");
+  nextUrl.searchParams.set("tab", "vakansiyalar");
+  if (page > 1) {
+    nextUrl.searchParams.set("vpage", String(page));
+  } else {
+    nextUrl.searchParams.delete("vpage");
+  }
+  history.pushState({}, "", nextUrl);
+  showVacancyList({ pushState: false });
+  renderVacancyGrid();
+  el.tabPanelVacancies?.scrollIntoView({ behavior: "smooth", block: "start" });
 });
 
 el.backBtn.addEventListener("click", showList);
@@ -626,6 +718,7 @@ el.tabBtnVacancies?.addEventListener("click", () => switchMainTab("vakansiyalar"
 
 function renderFromQuery() {
   currentPage = getPageFromUrl();
+  currentVacancyPage = getVacancyPageFromUrl();
   const url = new URL(window.location.href);
   const newsIdFromUrl = url.searchParams.get("news");
   const vacancyIdFromUrl = url.searchParams.get("vacancy");
