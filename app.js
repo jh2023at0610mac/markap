@@ -1,7 +1,9 @@
 import {
   getFirebaseReady,
   getSampleNews,
+  getSampleArticles,
   getSampleVacancies,
+  subscribeArticles,
   subscribeNews,
   subscribeVacancies,
   incrementViews
@@ -11,25 +13,37 @@ const SITE_URL = new URL("./", window.location.href).href;
 const PAGE_SIZE = 51;
 
 let news = [];
+let articles = [];
 let vacancies = [];
 let currentArticleId = null;
+let currentLongreadId = null;
 let currentVacancyId = null;
 let currentPage = 1;
+let currentArticlePage = 1;
 let currentVacancyPage = 1;
 let lastNewsListSig = "";
+let lastArticleListSig = "";
 let lastArticleContentSig = "";
 let lastVacancyDetailSig = "";
+let lastLongreadDetailSig = "";
 
 const el = {
   mainTabs: document.getElementById("mainTabs"),
   tabBtnNews: document.getElementById("tabBtnNews"),
+  tabBtnArticles: document.getElementById("tabBtnArticles"),
   tabBtnVacancies: document.getElementById("tabBtnVacancies"),
   tabPanelNews: document.getElementById("tabPanelNews"),
+  tabPanelArticles: document.getElementById("tabPanelArticles"),
   tabPanelVacancies: document.getElementById("tabPanelVacancies"),
+  articleGrid: document.getElementById("articleGrid"),
+  articlePager: document.getElementById("articlePager"),
   vacancyGrid: document.getElementById("vacancyGrid"),
   vacancySection: document.getElementById("vacancySection"),
   vacancyContent: document.getElementById("vacancyContent"),
   vacancyBackBtn: document.getElementById("vacancyBackBtn"),
+  longreadSection: document.getElementById("longreadSection"),
+  longreadContent: document.getElementById("longreadContent"),
+  longreadBackBtn: document.getElementById("longreadBackBtn"),
   newsGrid: document.getElementById("newsGrid"),
   newsListSection: document.getElementById("newsListSection"),
   articleSection: document.getElementById("articleSection"),
@@ -198,6 +212,12 @@ function getVacancyPageFromUrl() {
   return Math.floor(raw);
 }
 
+function getArticlePageFromUrl() {
+  const raw = Number(new URL(window.location.href).searchParams.get("apage") || "1");
+  if (!Number.isFinite(raw) || raw < 1) return 1;
+  return Math.floor(raw);
+}
+
 function getArticleHref(id) {
   const p = getPageFromUrl();
   return p > 1 ? `?page=${p}&news=${encodeURIComponent(id)}` : `?news=${encodeURIComponent(id)}`;
@@ -207,6 +227,12 @@ function getVacancyHref(id) {
   const p = getVacancyPageFromUrl();
   const base = p > 1 ? `?tab=vakansiyalar&vpage=${p}` : "?tab=vakansiyalar";
   return `${base}&vacancy=${encodeURIComponent(id)}`;
+}
+
+function getLongreadHref(id) {
+  const p = getArticlePageFromUrl();
+  const base = p > 1 ? `?tab=meqaleler&apage=${p}` : "?tab=meqaleler";
+  return `${base}&article=${encodeURIComponent(id)}`;
 }
 
 function formatVacancyPosted(ms) {
@@ -223,21 +249,31 @@ function formatVacancyPosted(ms) {
 
 function setActiveTabButtons(tab) {
   el.tabBtnNews?.classList.toggle("is-active", tab === "xeberler");
+  el.tabBtnArticles?.classList.toggle("is-active", tab === "meqaleler");
   el.tabBtnVacancies?.classList.toggle("is-active", tab === "vakansiyalar");
 }
 
 function switchMainTab(tab, { pushState = true } = {}) {
-  if (currentArticleId || currentVacancyId) return;
+  if (currentArticleId || currentVacancyId || currentLongreadId) return;
   el.mainTabs?.classList.remove("hidden");
   el.articleSection.classList.add("hidden");
   el.vacancySection?.classList.add("hidden");
+  el.longreadSection?.classList.add("hidden");
   if (tab === "vakansiyalar") {
     el.tabPanelNews?.classList.add("hidden");
+    el.tabPanelArticles?.classList.add("hidden");
     el.tabPanelVacancies?.classList.remove("hidden");
     setActiveTabButtons("vakansiyalar");
     renderVacancyGrid();
+  } else if (tab === "meqaleler") {
+    el.tabPanelNews?.classList.add("hidden");
+    el.tabPanelVacancies?.classList.add("hidden");
+    el.tabPanelArticles?.classList.remove("hidden");
+    setActiveTabButtons("meqaleler");
+    renderArticleGrid();
   } else {
     el.tabPanelVacancies?.classList.add("hidden");
+    el.tabPanelArticles?.classList.add("hidden");
     el.tabPanelNews?.classList.remove("hidden");
     el.newsListSection.classList.remove("hidden");
     setActiveTabButtons("xeberler");
@@ -246,11 +282,16 @@ function switchMainTab(tab, { pushState = true } = {}) {
   if (pushState) {
     const nextUrl = new URL(window.location.href);
     nextUrl.searchParams.delete("news");
+    nextUrl.searchParams.delete("article");
     nextUrl.searchParams.delete("vacancy");
+    nextUrl.searchParams.delete("apage");
     nextUrl.searchParams.delete("vpage");
     if (tab === "vakansiyalar") {
       nextUrl.searchParams.delete("page");
       nextUrl.searchParams.set("tab", "vakansiyalar");
+    } else if (tab === "meqaleler") {
+      nextUrl.searchParams.delete("page");
+      nextUrl.searchParams.set("tab", "meqaleler");
     } else {
       nextUrl.searchParams.delete("tab");
     }
@@ -315,11 +356,128 @@ function renderVacancyGrid() {
   renderVacancyPager(totalPages);
 }
 
+function articleDetailSignature(item) {
+  return JSON.stringify({
+    id: item.id,
+    title: item.title,
+    category: item.category,
+    excerpt: item.excerpt || "",
+    content: item.content || "",
+    image: item.image || "",
+    createdAtMs: Number(item.createdAtMs || 0)
+  });
+}
+
+function renderArticleGrid() {
+  if (!el.articleGrid) return;
+  const totalPages = Math.max(1, Math.ceil(articles.length / PAGE_SIZE));
+  currentArticlePage = Math.min(getArticlePageFromUrl(), totalPages);
+  const start = (currentArticlePage - 1) * PAGE_SIZE;
+  const pageItems = articles.slice(start, start + PAGE_SIZE);
+
+  if (!pageItems.length) {
+    el.articleGrid.innerHTML = `<p class="hint vacancy-empty">Hal-hazırda məqalə yoxdur.</p>`;
+    if (el.articlePager) {
+      el.articlePager.classList.add("hidden");
+      el.articlePager.innerHTML = "";
+    }
+    return;
+  }
+
+  el.articleGrid.innerHTML = pageItems
+    .map(
+      (item) => `
+    <article class="longread-card" data-article-id="${escapeAttr(item.id)}">
+      <a class="longread-link" href="${getLongreadHref(item.id)}" aria-label="${escapeAttr(item.title)}">
+        <img loading="lazy" class="news-cover" src="${escapeAttr(item.image || PLACEHOLDER_IMG)}" alt="${escapeAttr(item.title)}" />
+        <div class="longread-body">
+          <div class="news-meta"><span>${formatMeta(item.createdAtMs)}</span><span>${escapeHtml(item.category)}</span></div>
+          <h3 class="longread-title">${escapeHtml(item.title)}</h3>
+          <p class="longread-excerpt">${escapeHtml(item.excerpt || "")}</p>
+        </div>
+      </a>
+    </article>
+  `
+    )
+    .join("");
+  renderArticlePager(totalPages);
+}
+
+function showLongread(id, { pushState = true } = {}) {
+  const item = articles.find((a) => a.id === id);
+  if (!item) return;
+  currentLongreadId = item.id;
+  currentArticleId = null;
+  currentVacancyId = null;
+  lastArticleContentSig = "";
+
+  el.longreadContent.innerHTML = `
+    <img class="article-cover" src="${escapeAttr(item.image || PLACEHOLDER_IMG)}" alt="${escapeHtml(item.title)}" />
+    <div class="article-inner">
+      <div class="news-meta">${formatMeta(item.createdAtMs)} • ${escapeHtml(item.category)}</div>
+      <h2>${escapeHtml(item.title)}</h2>
+      <p>${escapeHtml(item.content)}</p>
+    </div>
+  `;
+
+  el.mainTabs?.classList.add("hidden");
+  el.tabPanelNews?.classList.add("hidden");
+  el.tabPanelVacancies?.classList.add("hidden");
+  el.tabPanelArticles?.classList.add("hidden");
+  el.articleSection.classList.add("hidden");
+  el.vacancySection?.classList.add("hidden");
+  el.longreadSection?.classList.remove("hidden");
+
+  if (pushState) {
+    const nextUrl = new URL(window.location.href);
+    nextUrl.searchParams.delete("news");
+    nextUrl.searchParams.delete("vacancy");
+    nextUrl.searchParams.delete("page");
+    nextUrl.searchParams.delete("vpage");
+    nextUrl.searchParams.set("tab", "meqaleler");
+    nextUrl.searchParams.set("article", item.id);
+    history.pushState({ article: item.id }, "", nextUrl);
+  }
+  lastLongreadDetailSig = articleDetailSignature(item);
+  updateSeoMeta(item);
+}
+
+function showArticleList({ pushState = true } = {}) {
+  currentLongreadId = null;
+  lastLongreadDetailSig = "";
+  el.longreadSection?.classList.add("hidden");
+  el.articleSection.classList.add("hidden");
+  el.vacancySection?.classList.add("hidden");
+  el.mainTabs?.classList.remove("hidden");
+  el.tabPanelNews?.classList.add("hidden");
+  el.tabPanelVacancies?.classList.add("hidden");
+  el.tabPanelArticles?.classList.remove("hidden");
+  setActiveTabButtons("meqaleler");
+  if (pushState) {
+    const nextUrl = new URL(window.location.href);
+    nextUrl.searchParams.delete("article");
+    nextUrl.searchParams.delete("news");
+    nextUrl.searchParams.delete("vacancy");
+    nextUrl.searchParams.delete("page");
+    nextUrl.searchParams.delete("vpage");
+    nextUrl.searchParams.set("tab", "meqaleler");
+    if (currentArticlePage > 1) {
+      nextUrl.searchParams.set("apage", String(currentArticlePage));
+    } else {
+      nextUrl.searchParams.delete("apage");
+    }
+    history.pushState({}, "", nextUrl);
+  }
+  renderArticleGrid();
+  updateSeoMeta();
+}
+
 function showVacancy(id, { pushState = true } = {}) {
   const v = vacancies.find((x) => x.id === id);
   if (!v) return;
   currentVacancyId = v.id;
   currentArticleId = null;
+  currentLongreadId = null;
   lastArticleContentSig = "";
 
   el.vacancyContent.innerHTML = `
@@ -348,12 +506,16 @@ function showVacancy(id, { pushState = true } = {}) {
   el.mainTabs?.classList.add("hidden");
   el.tabPanelNews?.classList.add("hidden");
   el.tabPanelVacancies?.classList.add("hidden");
+  el.tabPanelArticles?.classList.add("hidden");
   el.articleSection.classList.add("hidden");
+  el.longreadSection?.classList.add("hidden");
   el.vacancySection?.classList.remove("hidden");
 
   if (pushState) {
     const nextUrl = new URL(window.location.href);
     nextUrl.searchParams.delete("news");
+    nextUrl.searchParams.delete("article");
+    nextUrl.searchParams.delete("apage");
     nextUrl.searchParams.delete("page");
     nextUrl.searchParams.set("tab", "vakansiyalar");
     nextUrl.searchParams.set("vacancy", v.id);
@@ -469,6 +631,38 @@ function renderVacancyPager(totalPages) {
   );
   el.vacancyPager.classList.remove("hidden");
   el.vacancyPager.innerHTML = bits.join("");
+}
+
+function renderArticlePager(totalPages) {
+  if (!el.articlePager) return;
+  if (totalPages <= 1) {
+    el.articlePager.classList.add("hidden");
+    el.articlePager.innerHTML = "";
+    return;
+  }
+  const pages = buildPagerPages(totalPages, currentArticlePage);
+  const bits = [];
+  bits.push(
+    `<button class="pager-btn" data-apage="${Math.max(1, currentArticlePage - 1)}" ${
+      currentArticlePage <= 1 ? "disabled" : ""
+    }>Əvvəlki</button>`
+  );
+  pages.forEach((num, idx) => {
+    const prev = pages[idx - 1];
+    if (prev && num - prev > 1) {
+      bits.push('<span class="pager-gap">…</span>');
+    }
+    bits.push(
+      `<button class="pager-btn ${num === currentArticlePage ? "is-active" : ""}" data-apage="${num}">${num}</button>`
+    );
+  });
+  bits.push(
+    `<button class="pager-btn" data-apage="${Math.min(totalPages, currentArticlePage + 1)}" ${
+      currentArticlePage >= totalPages ? "disabled" : ""
+    }>Növbəti</button>`
+  );
+  el.articlePager.classList.remove("hidden");
+  el.articlePager.innerHTML = bits.join("");
 }
 
 function getSortedNews() {
@@ -598,6 +792,7 @@ function showArticle(id, { pushState = true, skipViewIncrement = false } = {}) {
   const item = news.find((n) => n.id === id);
   if (!item) return;
   currentArticleId = item.id;
+  currentLongreadId = null;
   if (!skipViewIncrement) {
     incrementViews(item.id).catch(() => {});
   }
@@ -615,12 +810,16 @@ function showArticle(id, { pushState = true, skipViewIncrement = false } = {}) {
   el.mainTabs?.classList.add("hidden");
   el.tabPanelNews?.classList.add("hidden");
   el.tabPanelVacancies?.classList.add("hidden");
+  el.tabPanelArticles?.classList.add("hidden");
   el.vacancySection?.classList.add("hidden");
+  el.longreadSection?.classList.add("hidden");
   el.newsListSection.classList.add("hidden");
   el.articleSection.classList.remove("hidden");
   if (pushState) {
     const nextUrl = new URL(window.location.href);
+    nextUrl.searchParams.delete("article");
     nextUrl.searchParams.delete("vacancy");
+    nextUrl.searchParams.delete("apage");
     nextUrl.searchParams.delete("tab");
     nextUrl.searchParams.delete("vpage");
     nextUrl.searchParams.set("news", item.id);
@@ -633,19 +832,25 @@ function showArticle(id, { pushState = true, skipViewIncrement = false } = {}) {
 function showList({ pushState = true } = {}) {
   currentArticleId = null;
   currentVacancyId = null;
+  currentLongreadId = null;
   lastArticleContentSig = "";
   lastVacancyDetailSig = "";
+  lastLongreadDetailSig = "";
   el.articleSection.classList.add("hidden");
   el.vacancySection?.classList.add("hidden");
+  el.longreadSection?.classList.add("hidden");
   el.mainTabs?.classList.remove("hidden");
   el.tabPanelVacancies?.classList.add("hidden");
+  el.tabPanelArticles?.classList.add("hidden");
   el.tabPanelNews?.classList.remove("hidden");
   el.newsListSection.classList.remove("hidden");
   setActiveTabButtons("xeberler");
   if (pushState) {
     const nextUrl = new URL(window.location.href);
     nextUrl.searchParams.delete("news");
+    nextUrl.searchParams.delete("article");
     nextUrl.searchParams.delete("vacancy");
+    nextUrl.searchParams.delete("apage");
     nextUrl.searchParams.delete("tab");
     nextUrl.searchParams.delete("vpage");
     history.pushState({}, "", nextUrl);
@@ -657,6 +862,14 @@ mainEl?.addEventListener("click", (ev) => {
   const raw = ev.target;
   const base = raw instanceof Element ? raw : raw.parentElement;
   if (!base) return;
+  const along = base.closest(".longread-link");
+  if (along) {
+    ev.preventDefault();
+    const card = along.closest("[data-article-id]");
+    const aid = card?.getAttribute("data-article-id");
+    if (aid) showLongread(aid);
+    return;
+  }
   const vlink = base.closest(".vacancy-link");
   if (vlink) {
     ev.preventDefault();
@@ -711,19 +924,49 @@ el.vacancyPager?.addEventListener("click", (ev) => {
   el.tabPanelVacancies?.scrollIntoView({ behavior: "smooth", block: "start" });
 });
 
+el.articlePager?.addEventListener("click", (ev) => {
+  const btn = ev.target.closest(".pager-btn[data-apage]");
+  if (!btn || btn.disabled) return;
+  const page = Number(btn.dataset.apage);
+  if (!Number.isFinite(page) || page < 1) return;
+  const nextUrl = new URL(window.location.href);
+  nextUrl.searchParams.delete("news");
+  nextUrl.searchParams.delete("vacancy");
+  nextUrl.searchParams.delete("page");
+  nextUrl.searchParams.delete("vpage");
+  nextUrl.searchParams.set("tab", "meqaleler");
+  if (page > 1) {
+    nextUrl.searchParams.set("apage", String(page));
+  } else {
+    nextUrl.searchParams.delete("apage");
+  }
+  history.pushState({}, "", nextUrl);
+  showArticleList({ pushState: false });
+  renderArticleGrid();
+  el.tabPanelArticles?.scrollIntoView({ behavior: "smooth", block: "start" });
+});
+
 el.backBtn.addEventListener("click", showList);
 el.vacancyBackBtn?.addEventListener("click", () => showVacancyList());
+el.longreadBackBtn?.addEventListener("click", () => showArticleList());
 el.tabBtnNews?.addEventListener("click", () => switchMainTab("xeberler"));
+el.tabBtnArticles?.addEventListener("click", () => switchMainTab("meqaleler"));
 el.tabBtnVacancies?.addEventListener("click", () => switchMainTab("vakansiyalar"));
 
 function renderFromQuery() {
   currentPage = getPageFromUrl();
+  currentArticlePage = getArticlePageFromUrl();
   currentVacancyPage = getVacancyPageFromUrl();
   const url = new URL(window.location.href);
   const newsIdFromUrl = url.searchParams.get("news");
+  const articleIdFromUrl = url.searchParams.get("article");
   const vacancyIdFromUrl = url.searchParams.get("vacancy");
   if (newsIdFromUrl) {
     showArticle(newsIdFromUrl, { pushState: false });
+    return;
+  }
+  if (articleIdFromUrl) {
+    showLongread(articleIdFromUrl, { pushState: false });
     return;
   }
   if (vacancyIdFromUrl) {
@@ -731,20 +974,32 @@ function renderFromQuery() {
     return;
   }
   currentArticleId = null;
+  currentLongreadId = null;
   currentVacancyId = null;
   lastArticleContentSig = "";
+  lastLongreadDetailSig = "";
   lastVacancyDetailSig = "";
   el.articleSection.classList.add("hidden");
   el.vacancySection?.classList.add("hidden");
+  el.longreadSection?.classList.add("hidden");
   el.mainTabs?.classList.remove("hidden");
   const onVacancies = url.searchParams.get("tab") === "vakansiyalar";
+  const onArticles = url.searchParams.get("tab") === "meqaleler";
   if (onVacancies) {
     el.tabPanelNews?.classList.add("hidden");
+    el.tabPanelArticles?.classList.add("hidden");
     el.tabPanelVacancies?.classList.remove("hidden");
     setActiveTabButtons("vakansiyalar");
     renderVacancyGrid();
+  } else if (onArticles) {
+    el.tabPanelNews?.classList.add("hidden");
+    el.tabPanelVacancies?.classList.add("hidden");
+    el.tabPanelArticles?.classList.remove("hidden");
+    setActiveTabButtons("meqaleler");
+    renderArticleGrid();
   } else {
     el.tabPanelVacancies?.classList.add("hidden");
+    el.tabPanelArticles?.classList.add("hidden");
     el.tabPanelNews?.classList.remove("hidden");
     el.newsListSection.classList.remove("hidden");
     setActiveTabButtons("xeberler");
@@ -774,13 +1029,44 @@ function showConfigWarning() {
 
 if (!getFirebaseReady()) {
   news = getSampleNews();
+  articles = getSampleArticles();
   vacancies = getSampleVacancies();
   renderNewsGrid();
+  renderArticleGrid();
   renderVacancyGrid();
   renderFromQuery();
   showConfigWarning();
 } else {
+  articles = [];
   vacancies = [];
+  subscribeArticles(
+    (items) => {
+      articles = items;
+      const sig = JSON.stringify(items.map((i) => [i.id, Number(i.createdAtMs || 0), i.title || ""]));
+      if (sig !== lastArticleListSig) {
+        lastArticleListSig = sig;
+        renderArticleGrid();
+      }
+      if (currentLongreadId) {
+        const active = articles.find((a) => a.id === currentLongreadId);
+        if (!active) {
+          lastLongreadDetailSig = "";
+          currentLongreadId = null;
+          renderFromQuery();
+        } else {
+          const dSig = articleDetailSignature(active);
+          if (dSig !== lastLongreadDetailSig) {
+            showLongread(active.id, { pushState: false });
+          }
+        }
+      }
+    },
+    () => {
+      articles = getSampleArticles();
+      renderArticleGrid();
+    }
+  );
+
   subscribeVacancies(
     (items) => {
       vacancies = items;
@@ -843,6 +1129,20 @@ if (!getFirebaseReady()) {
           currentVacancyId = null;
           renderFromQuery();
         }
+      } else if (currentLongreadId) {
+        const a = articles.find((x) => x.id === currentLongreadId);
+        if (a) {
+          const sig = articleDetailSignature(a);
+          if (sig !== lastLongreadDetailSig) {
+            showLongread(a.id, { pushState: false });
+          } else {
+            updateSeoMeta(a);
+          }
+        } else {
+          lastLongreadDetailSig = "";
+          currentLongreadId = null;
+          renderFromQuery();
+        }
       } else {
         renderFromQuery();
       }
@@ -850,7 +1150,7 @@ if (!getFirebaseReady()) {
       active = currentArticleId
         ? news.find((n) => n.id === currentArticleId)
         : null;
-      if (!currentVacancyId) {
+      if (!currentVacancyId && !currentLongreadId) {
         updateSeoMeta(active || undefined);
       }
     },
@@ -864,9 +1164,14 @@ window.addEventListener("popstate", () => {
   currentPage = getPageFromUrl();
   const url = new URL(window.location.href);
   const qNews = url.searchParams.get("news");
+  const qArticle = url.searchParams.get("article");
   const qVacancy = url.searchParams.get("vacancy");
   if (qNews) {
     showArticle(qNews, { pushState: false });
+    return;
+  }
+  if (qArticle) {
+    showLongread(qArticle, { pushState: false });
     return;
   }
   if (qVacancy) {

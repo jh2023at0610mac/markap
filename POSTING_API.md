@@ -3,6 +3,7 @@
 Use this endpoint to publish ready-made articles from your other system.
 
 **Vacancies:** same `POST_SECRET` and env vars — see [POSTING_VACANCIES_API.md](./POSTING_VACANCIES_API.md) (`POST /api/post-vacancy`).
+**Articles:** same `POST_SECRET` and env vars — see [POSTING_ARTICLES_API.md](./POSTING_ARTICLES_API.md) (`POST /api/post-article`).
 
 ## Endpoint
 

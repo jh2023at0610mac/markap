@@ -66,6 +66,10 @@ function getVacanciesCollection() {
   return collection(db, "vacancies");
 }
 
+function getArticlesCollection() {
+  return collection(db, "articles");
+}
+
 const SAMPLE_VACANCIES = [
   {
     id: "vac-markap-001",
@@ -133,6 +137,21 @@ const SAMPLE_VACANCIES = [
   }
 ];
 
+const SAMPLE_ARTICLES = [
+  {
+    id: "art-001",
+    title: "Azərbaycan mediasında rəqəmsal transformasiya",
+    category: "Analitika",
+    image:
+      "https://images.unsplash.com/photo-1495020689067-958852a7765e?auto=format&fit=crop&w=1400&q=80",
+    excerpt: "Media istehlakı vərdişləri və platforma keçidinin əsas istiqamətləri.",
+    content:
+      "Son illər xəbər istehlakında mobil üstünlük açıq şəkildə görünür.\n\nBu dəyişiklik redaksiyaların həm format, həm də yayım strategiyasını yenidən qurmasını tələb edir.\n\nAnalitik məqalədə kontent planlama, oxucu davranışı və monetizasiya modellərinə ayrıca baxılır.",
+    createdAtMs: Date.now() - 86400000 * 2,
+    status: "published"
+  }
+];
+
 function normalizeNews(record) {
   return {
     id: record.id,
@@ -156,6 +175,10 @@ export function getSampleNews() {
 
 export function getSampleVacancies() {
   return SAMPLE_VACANCIES.map((v) => ({ ...v }));
+}
+
+export function getSampleArticles() {
+  return SAMPLE_ARTICLES.map((a) => ({ ...a }));
 }
 
 function normalizeVacancy(record) {
@@ -189,6 +212,39 @@ export function subscribeVacancies(onData, onError) {
       const items = snap.docs
         .map((d) => normalizeVacancy({ id: d.id, ...d.data() }))
         .filter((v) => v.status !== "draft");
+      onData(items);
+    },
+    onError
+  );
+}
+
+function normalizeArticle(record) {
+  const raw = String(record.status || "published").trim() || "published";
+  const status = raw.toLowerCase() === "draft" ? "draft" : "published";
+  return {
+    id: record.id,
+    title: record.title || "",
+    category: record.category || "Məqalə",
+    image: record.image || "",
+    excerpt: record.excerpt || "",
+    content: record.content || "",
+    createdAtMs: Number(record.createdAtMs || Date.now()),
+    status
+  };
+}
+
+export function subscribeArticles(onData, onError) {
+  if (!getFirebaseReady()) {
+    onData(getSampleArticles());
+    return () => {};
+  }
+  const q = query(getArticlesCollection(), orderBy("createdAtMs", "desc"));
+  return onSnapshot(
+    q,
+    (snap) => {
+      const items = snap.docs
+        .map((d) => normalizeArticle({ id: d.id, ...d.data() }))
+        .filter((a) => a.status !== "draft");
       onData(items);
     },
     onError

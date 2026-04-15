@@ -53,6 +53,9 @@
         <button type="button" class="main-tab is-active" id="tabBtnNews" data-tab="xeberler">
           Xəbərlər
         </button>
+        <button type="button" class="main-tab" id="tabBtnArticles" data-tab="meqaleler">
+          Məqalələr
+        </button>
         <button type="button" class="main-tab" id="tabBtnVacancies" data-tab="vakansiyalar">
           Vakansiyalar
         </button>
@@ -78,6 +81,13 @@
         <nav id="vacancyPager" class="pager hidden" aria-label="Vakansiya səhifələri"></nav>
       </div>
 
+      <div id="tabPanelArticles" class="hidden">
+        <h2 class="section-title">Məqalələr</h2>
+        <p class="hint tab-hint">Uzun oxular və analitik yazılar.</p>
+        <div id="articleGrid" class="article-grid"></div>
+        <nav id="articlePager" class="pager hidden" aria-label="Məqalə səhifələri"></nav>
+      </div>
+
       <section id="articleSection" class="article-section hidden">
         <button id="backBtn" class="back-btn">← Xəbərlərə qayıt</button>
         <article id="articleContent" class="article-card"></article>
@@ -86,6 +96,11 @@
       <section id="vacancySection" class="article-section hidden">
         <button id="vacancyBackBtn" class="back-btn">← Vakansiyalara qayıt</button>
         <article id="vacancyContent" class="article-card"></article>
+      </section>
+
+      <section id="longreadSection" class="article-section hidden">
+        <button id="longreadBackBtn" class="back-btn">← Məqalələrə qayıt</button>
+        <article id="longreadContent" class="article-card"></article>
       </section>
     </main>
 

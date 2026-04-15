@@ -4,7 +4,7 @@
 2. Enable **Authentication -> Sign-in method -> Email/Password**.
 3. Create at least one admin user in **Authentication -> Users**.
 4. Enable **Firestore Database** (production mode).
-5. Create collection names: `news`, and optionally `vacancies` (created automatically when you first post a vacancy via API).
+5. Create collection names: `news`, and optionally `vacancies`, `articles` (created automatically when first posted via API).
 6. Open `firebase-config.js` and replace all `REPLACE_WITH_...` values with your web app config.
 
 ## Firestore rules
@@ -20,6 +20,10 @@ service cloud.firestore {
       allow write: if request.auth != null;
     }
     match /vacancies/{docId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+    match /articles/{docId} {
       allow read: if true;
       allow write: if request.auth != null;
     }
@@ -39,4 +43,4 @@ If you want stricter control later, you can require `request.auth.token.admin ==
 4. Redeploy after adding env vars.
 5. Use `POST /api/post-news` with `Authorization: Bearer <POST_SECRET>`.
 
-Full request examples: `POSTING_API.md` (news), `POSTING_VACANCIES_API.md` (`POST /api/post-vacancy`).
+Full request examples: `POSTING_API.md` (news), `POSTING_VACANCIES_API.md` (`POST /api/post-vacancy`), `POSTING_ARTICLES_API.md` (`POST /api/post-article`).
